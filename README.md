@@ -1,3 +1,23 @@
+![Bsd Logo](https://www.blacksharkden.com/templates/blacksharkden/images/Blacksharkcustom3small.png)
+
+CTLD enhancements:
+
+Enhancements done: 
+
+* Is not required to name the units anymore. all the helicopter units will be CTLD enabled but with size restrictions. 
+Limits also is now combined with CSAR troops transports. 
+
+* Added Multiple Pick up of troops. (with a limit based on aircraft type)
+
+* Added Loadable group config by Aircraft type:  (Standard group for an mi8 is larger than a standard group for a huey, but only one entry is displayed in the f10 menu)
+
+* Troops Run and de-spawn one by one when extracted
+
+* Action zones: and Enhancement to the current waypoint zones to add actions to take once in the area, based on a user flag. actions
+can be, Return to deploy point, continue to other waypoint.
+This can be used in missions where you need troops to be deploy and after some task or event they need to be extracted from where you left them or a new extraction point.
+
+[![](http://img.youtube.com/vi/Q6cVd703-o8/0.jpg)](http://www.youtube.com/watch?v=8BL3kVooOWg&t=21s "BSD-CTLD")
 
 # DCS-CTLD
 
