@@ -17,7 +17,8 @@ Limits also is now combined with CSAR troops transports.
 can be, Return to deploy point, continue to other waypoint.
 This can be used in missions where you need troops to be deploy and after some task or event they need to be extracted from where you left them or a new extraction point.
 
-[![](http://img.youtube.com/vi/Q6cVd703-o8/0.jpg)](http://www.youtube.com/watch?v=8BL3kVooOWg&t=21s "BSD-CTLD")
+[![](http://img.youtube.com/vi/8BL3kVooOWg&t=21s/0.jpg)](http://www.youtube.com/watch?v=8BL3kVooOWg&t=21s "BSD-CTLD")
+
 
 # DCS-CTLD
 
