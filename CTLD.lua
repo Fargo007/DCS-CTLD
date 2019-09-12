@@ -1,5 +1,7 @@
 --[[
     Combat Troop and Logistics Drop
+    assert(loadfile("C:\\LUA Dev Tool\\workspace\\My_Missions\\PersistentMission\\fac.lua"))()
+--assert(loadfile("C:\\Users\\marcos\\Google Drive\\DCS Mission Engine\\Workspace\\DCS_Missions\\CTLD-RUN MODIFICATIONS.lua"))()
 
     Allows Huey, Mi-8 and C130 to transport troops internally and Helicopters to transport Logistic / Vehicle units to the field via sling-loads
     without requiring external mods.
@@ -22,30 +24,43 @@
 
 ctld = {} -- DONT REMOVE!
 
+az = {}
+
 -- ************************************************************************
 -- *********************  USER CONFIGURATION ******************************
 -- ************************************************************************
 
 ctld.staticBugWorkaround = false --  DCS had a bug where destroying statics would cause a crash. If this happens again, set this to TRUE
 
-ctld.disableAllSmoke = false -- if true, all smoke is diabled at pickup and drop off zones regardless of settings below. Leave false to respect settings below
+ctld.disableAllSmoke = true -- if true, all smoke is diabled at pickup and drop off zones regardless of settings below. Leave false to respect settings below
 
 ctld.hoverPickup = true --  if set to false you can load crates with the F10 menu instead of hovering... Only if not using real crates!
 
 ctld.enableCrates = true -- if false, Helis will not be able to spawn or unpack crates so will be normal CTTS
-ctld.slingLoad = false -- if false, crates can be used WITHOUT slingloading, by hovering above the crate, simulating slingloading but not the weight...
+ctld.slingLoad = true -- if false, crates can be used WITHOUT slingloading, by hovering above the crate, simulating slingloading but not the weight...
 -- There are some bug with Sling-loading that can cause crashes, if these occur set slingLoad to false
 -- to use the other method.
 -- Set staticBugFix  to FALSE if use set ctld.slingLoad to TRUE
 
 ctld.enableSmokeDrop = true -- if false, helis and c-130 will not be able to drop smoke
+-- ----------------------------------------------------------------------------------------------------------
+-- -------------------------------------------------------- Tupper Troops Run to extract beg 
+-- ---------------------------------------------------------------------------------------------------------
+-- ctld.maxExtractDistance = 125 -- max distance from vehicle to troops to allow a group extraction
+ctld.maxExtractDistance = 500 -- max distance from vehicle to troops to allow a group extraction
+ctld.loadtimemax = 170
+ctld.embarking = {}
+ctld.heliembarking = {}
+-- ----------------------------------------------------------------------------------------------------------
+-- -------------------------------------------------------- Tupper Troops Run to extract end
+-- ----------------------------------------------------------------------------------------------------------
 
-ctld.maxExtractDistance = 125 -- max distance from vehicle to troops to allow a group extraction
+
 ctld.maximumDistanceLogistic = 200 -- max distance from vehicle to logistics to allow a loading or spawning operation
 ctld.maximumSearchDistance = 4000 -- max distance for troops to search for enemy
 ctld.maximumMoveDistance = 2000 -- max distance for troops to move from drop point if no enemy is nearby
 
-ctld.minimumDeployDistance = 1000 -- minimum distance from a friendly pickup zone where you can deploy a crate
+ctld.minimumDeployDistance = 500 -- minimum distance from a friendly pickup zone where you can deploy a crate
 
 ctld.numberOfTroops = 10 -- default number of troops to load on a transport heli or C-130 
 							-- also works as maximum size of group that'll fit into a helicopter unless overridden
@@ -118,8 +133,8 @@ ctld.JTAC_dropEnabled = true -- allow JTAC Crate spawn from F10 menu
 
 ctld.JTAC_maxDistance = 10000 -- How far a JTAC can "see" in meters (with Line of Sight)
 
-ctld.JTAC_smokeOn_RED = true -- enables marking of target with smoke for RED forces
-ctld.JTAC_smokeOn_BLUE = true -- enables marking of target with smoke for BLUE forces
+ctld.JTAC_smokeOn_RED = false -- enables marking of target with smoke for RED forces
+ctld.JTAC_smokeOn_BLUE = false -- enables marking of target with smoke for BLUE forces
 
 ctld.JTAC_smokeColour_RED = 4 -- RED side smoke colour -- Green = 0 , Red = 1, White = 2, Orange = 3, Blue = 4
 ctld.JTAC_smokeColour_BLUE = 1 -- BLUE side smoke colour -- Green = 0 , Red = 1, White = 2, Orange = 3, Blue = 4
@@ -127,7 +142,6 @@ ctld.JTAC_smokeColour_BLUE = 1 -- BLUE side smoke colour -- Green = 0 , Red = 1,
 ctld.JTAC_jtacStatusF10 = true -- enables F10 JTAC Status menu
 
 ctld.JTAC_location = true -- shows location of target in JTAC message
-ctld.location_DMS = false -- shows coordinates as Degrees Minutes Seconds instead of Degrees Decimal minutes
 
 ctld.JTAC_lock = "all" -- "vehicle" OR "troop" OR "all" forces JTAC to only lock vehicles or troops or all ground units
 
@@ -151,7 +165,7 @@ ctld.JTAC_lock = "all" -- "vehicle" OR "troop" OR "all" forces JTAC to only lock
 
 --pickupZones = { "Zone name or Ship Unit Name", "smoke color", "limit (-1 unlimited)", "ACTIVE (yes/no)", "side (0 = Both sides / 1 = Red / 2 = Blue )", flag number (optional) }
 ctld.pickupZones = {
-    { "pickzone1", "blue", -1, "yes", 0 },
+    { "pickzone1", "blue", 0, "yes", 0 },
     { "pickzone2", "red", -1, "yes", 0 },
     { "pickzone3", "none", -1, "yes", 0 },
     { "pickzone4", "none", -1, "yes", 0 },
@@ -174,6 +188,11 @@ ctld.pickupZones = {
     { "pickzone20", "none", 10, "yes", 0, 1000 }, -- optional extra flag number to store the current number of groups available in
 
     { "USA Carrier", "blue", 10, "yes", 0, 1001 }, -- instead of a Zone Name you can also use the UNIT NAME of a ship
+    { "vinson", "none", 10, "yes", 0, 1001 }, -- instead of a Zone Name you can also use the UNIT NAME of a ship
+    { "tarawa", "none", -1, "yes", 0, 1001 }, -- instead of a Zone Name you can also use the UNIT NAME of a ship
+    { "mistral", "none", 10, "yes", 0, 1001 }, -- instead of a Zone Name you can also use the UNIT NAME of a ship
+    { "stennis1", "none", -1, "yes", 0, 1001 },
+    { "normandy", "none", 10, "yes", 0, 1001 },
 }
 
 
@@ -192,146 +211,82 @@ ctld.dropOffZones = {
 }
 
 
---wpZones = { "Zone name", "smoke color",  "ACTIVE (yes/no)", "side (0 = Both sides / 1 = Red / 2 = Blue )", }
+--wpZones = { "Zone name", "smoke color",  "ACTIVE (yes/no)", "side (0 = Both sides / 1 = Red / 2 = Blue )", formation ( }
+--[["Off Road" - moving off-road in Column formation 
+ "On Road" - moving on road in Column formation 
+ "Rank" - moving off road in Row formation 
+ "Cone" - moving in Wedge formation 
+ "Vee" - moving in Vee formation 
+ "Diamond" - moving in Diamond formation 
+ "EchelonL" - moving in Echelon Left formation 
+ "EchelonR" - moving in Echelon Right formation ]] --
+   
 ctld.wpZones = {
-    { "wpzone1", "green","yes", 2 },
-    { "wpzone2", "blue","yes", 2 },
-    { "wpzone3", "orange","yes", 2 },
-    { "wpzone4", "none","yes", 2 },
-    { "wpzone5", "none","yes", 2 },
-    { "wpzone6", "none","yes", 1 },
-    { "wpzone7", "none","yes", 1 },
-    { "wpzone8", "none","yes", 1 },
-    { "wpzone9", "none","yes", 1 },
-    { "wpzone10", "none","no", 0 }, -- Both sides as its set to 0
+    { "wpzone1", "green","yes", 2 , "Rank" },
+    { "wpzone2", "blue","yes", 2 ,"Vee"   },
+    { "wpzone3", "orange","yes", 2 ,"Off Road"   },
+    { "wpzone4", "none","yes", 2 ,"Off Road"   },
+    { "wpzone5", "none","yes", 2 ,"Rank"   },
+    { "wpzone6", "none","yes", 1 ,"Off Road"   },
+    { "wpzone7", "none","yes", 1 ,"Off Road"   },
+    { "wpzone8", "none","yes", 1 ,"Off Road"   },
+    { "wpzone9", "none","yes", 1 ,"Off Road"   },
+    { "wpzone10", "none","no", 0 ,"Off Road"   }, -- Both sides as its set to 0
+    { "wpzone21", "none","yes", 0 ,"Off Road"  },
+    { "wpzone22", "none","yes", 0 ,"Off Road"  },
+    { "wpzone23", "none","yes", 0 ,"Off Road"   },
+    { "wpzone24", "none","yes", 0 ,"Off Road"  },
+    { "wpzone25", "none","yes", 0 ,"Off Road"  },
+    { "wpzone26", "none","yes", 0 ,"Off Road"  },
+    { "wpzone27", "none","yes", 0 ,"Off Road"  },
+    { "wpzone28", "none","yes", 0,"Off Road"   },
+    { "wpzone29", "none","yes", 0 ,"Off Road"  },
+    { "wpzone30", "none","yes", 0 ,"Off Road"  },
+    { "wpzone31", "none","yes", 0 ,"Off Road"  },
+    { "wpzone32", "none","yes", 0 ,"Off Road"  },
+    { "wpzone33", "none","yes", 0 ,"Off Road"  },
+    { "wpzone34", "none","yes", 0 ,"Off Road"  },
+    { "wpzone35", "none","yes", 0 ,"Off Road" },
+    { "wpzone36", "none","yes", 0 ,"Off Road" },
+    { "wpzone37", "none","yes", 0 ,"Off Road" },
+    { "wpzone38", "none","yes", 0 ,"Off Road" },
+    { "wpzone39", "none","yes", 0 ,"Off Road"},
+    { "wpzone40", "none","yes", 0 ,"Off Road" },
+    { "wpzone41", "none","yes", 0 ,"Off Road" },
+    { "wpzone42", "none","yes", 0 ,"Off Road" },
+    { "wpzone43", "none","yes", 0 ,"Off Road" },
+    { "wpzone44", "none","yes", 0 ,"Off Road" },
+    { "wpzone45", "none","yes", 0 ,"Off Road" },
+    { "wpzone46", "none","yes", 0 ,"Off Road" }, 
+    { "wpzone47", "none","yes", 0 ,"Off Road" }, 
+    { "wpzone48", "none","yes", 0 ,"Off Road"}, 
+    { "wpzone49", "none","yes", 0 ,"Off Road"}, 
+    { "wpzone50", "none","yes", 0 ,"Off Road"}, 
+    { "wpzone51", "none","yes", 0 ,"Off Road"}, 
+    { "wpzone52", "none","yes", 0 ,"Off Road"},
+    { "wpzone53", "none","yes", 0 ,"Off Road"},
+    { "wpzone54", "none","yes", 0 ,"Off Road"},
+    { "wpzone55", "none","yes", 0 ,"Off Road"},
+    { "wpzone56", "none","yes", 0 ,"Off Road"},
+    { "wpzone57", "none","yes", 0 ,"Off Road"},
+    { "wpzone58", "none","yes", 0 ,"Off Road"}, 
+    { "wpzone59", "none","yes", 0 ,"Off Road"}, 
 }
+
+-- ME zone name, increment flag per group ,flagproceed(flag or nil), return to dropzone (true, false), proceed to zone (zone or nil) 
+az.actionZones = {
+    { "wpzone1", "889" ,"999" , true, nil },
+    { "wpzone2", "888" , "998", false, "wpzone3" },  -- Won't return to dropped point but proceed to wp3. To do multiple task
+    { "wpzone3", "778" , nil, false, nil }  -- To use as an extraction point
+    }
+az.zoneFlgDistance = 20 -- Meters from the center of the zone to trigger the in zone flag     
+az.groupsdropped = {}    
 
 
 -- ******************** Transports names **********************
 
 -- Use any of the predefined names or set your own ones
-ctld.transportPilotNames = {
-    "helicargo1",
-    "helicargo2",
-    "helicargo3",
-    "helicargo4",
-    "helicargo5",
-    "helicargo6",
-    "helicargo7",
-    "helicargo8",
-    "helicargo9",
-    "helicargo10",
-
-    "helicargo11",
-    "helicargo12",
-    "helicargo13",
-    "helicargo14",
-    "helicargo15",
-    "helicargo16",
-    "helicargo17",
-    "helicargo18",
-    "helicargo19",
-    "helicargo20",
-
-    "helicargo21",
-    "helicargo22",
-    "helicargo23",
-    "helicargo24",
-    "helicargo25",
-
-    "MEDEVAC #1",
-    "MEDEVAC #2",
-    "MEDEVAC #3",
-    "MEDEVAC #4",
-    "MEDEVAC #5",
-    "MEDEVAC #6",
-    "MEDEVAC #7",
-    "MEDEVAC #8",
-    "MEDEVAC #9",
-    "MEDEVAC #10",
-    "MEDEVAC #11",
-    "MEDEVAC #12",
-    "MEDEVAC #13",
-    "MEDEVAC #14",
-    "MEDEVAC #15",
-    "MEDEVAC #16",
-
-    "MEDEVAC RED #1",
-    "MEDEVAC RED #2",
-    "MEDEVAC RED #3",
-    "MEDEVAC RED #4",
-    "MEDEVAC RED #5",
-    "MEDEVAC RED #6",
-    "MEDEVAC RED #7",
-    "MEDEVAC RED #8",
-    "MEDEVAC RED #9",
-    "MEDEVAC RED #10",
-    "MEDEVAC RED #11",
-    "MEDEVAC RED #12",
-    "MEDEVAC RED #13",
-    "MEDEVAC RED #14",
-    "MEDEVAC RED #15",
-    "MEDEVAC RED #16",
-    "MEDEVAC RED #17",
-    "MEDEVAC RED #18",
-    "MEDEVAC RED #19",
-    "MEDEVAC RED #20",
-    "MEDEVAC RED #21",
-
-    "MEDEVAC BLUE #1",
-    "MEDEVAC BLUE #2",
-    "MEDEVAC BLUE #3",
-    "MEDEVAC BLUE #4",
-    "MEDEVAC BLUE #5",
-    "MEDEVAC BLUE #6",
-    "MEDEVAC BLUE #7",
-    "MEDEVAC BLUE #8",
-    "MEDEVAC BLUE #9",
-    "MEDEVAC BLUE #10",
-    "MEDEVAC BLUE #11",
-    "MEDEVAC BLUE #12",
-    "MEDEVAC BLUE #13",
-    "MEDEVAC BLUE #14",
-    "MEDEVAC BLUE #15",
-    "MEDEVAC BLUE #16",
-    "MEDEVAC BLUE #17",
-    "MEDEVAC BLUE #18",
-    "MEDEVAC BLUE #19",
-    "MEDEVAC BLUE #20",
-    "MEDEVAC BLUE #21",
-
-    -- *** AI transports names (different names only to ease identification in mission) ***
-
-    -- Use any of the predefined names or set your own ones
-
-    "transport1",
-    "transport2",
-    "transport3",
-    "transport4",
-    "transport5",
-    "transport6",
-    "transport7",
-    "transport8",
-    "transport9",
-    "transport10",
-
-    "transport11",
-    "transport12",
-    "transport13",
-    "transport14",
-    "transport15",
-    "transport16",
-    "transport17",
-    "transport18",
-    "transport19",
-    "transport20",
-
-    "transport21",
-    "transport22",
-    "transport23",
-    "transport24",
-    "transport25",
-}
+ctld.transportPilotNames = {}
 
 -- *************** Optional Extractable GROUPS *****************
 
@@ -383,6 +338,11 @@ ctld.logisticUnits = {
     "logistic8",
     "logistic9",
     "logistic10",
+    "logistic11",
+    "logistic12",
+    "logistic13",
+    "logistic14",
+    "logistic15",     
 }
 
 -- ************** UNITS ABLE TO TRANSPORT VEHICLES ******************
@@ -407,9 +367,17 @@ ctld.vehicleTransportEnabled = {
 ctld.unitLoadLimits = {
 
     -- Remove the -- below to turn on options
-    -- ["SA342Mistral"] = 4,
-    -- ["SA342L"] = 4,
-    -- ["SA342M"] = 4,
+     ["SA342Mistral"] = 2,
+     ["SA342Minigun"] = 1,
+     ["SA342L"] = 2,
+     ["SA342M"] = 2,
+  
+    ["UH-1H"] = 8,
+    ["Mi-8MT"] = 16,
+    ["UH-60A"] = 16,
+    
+    ["CH-47D"] = 20,
+    
 
 }
 
@@ -431,10 +399,11 @@ ctld.unitLoadLimits = {
 ctld.unitActions = {
 
     -- Remove the -- below to turn on options
-    -- ["SA342Mistral"] = {crates=true, troops=true},
-    -- ["SA342L"] = {crates=false, troops=true},
-    -- ["SA342M"] = {crates=false, troops=true},
-
+     ["SA342Mistral"] = {crates=false, troops=true},
+     ["SA342Minigun"] = {crates=false, troops=true},         
+     ["SA342L"] = {crates=false, troops=true},
+     ["SA342M"] = {crates=false, troops=true},
+     ["Ka-50"] =  {crates= true, troops=false},
 }
 
 -- ************** INFANTRY GROUPS FOR PICKUP ******************
@@ -447,13 +416,53 @@ ctld.unitActions = {
 -- You must add a name to the group for it to work
 -- You can also add an optional coalition side to limit the group to one side
 -- for the side - 2 is BLUE and 1 is RED
-ctld.loadableGroups = {
-    {name = "Standard Group", inf = 6, mg = 2, at = 2 }, -- will make a loadable group with 5 infantry, 2 MGs and 2 anti-tank for both coalitions
-    {name = "Anti Air", inf = 2, aa = 3  },
-    {name = "Anti Tank", inf = 2, at = 6  },
-    {name = "Mortar Squad", mortar = 6 },
+-- Tupper Begin
+ ctld.loadableGroups = {
+                      {name = "Standard Group", inf = 6, mg = 2, at = 2 }, -- will make a loadable group with 5 infantry, 2 MGs and 2 anti-tank for both coalitions
+                      {name = "Anti Air", inf = 2, aa = 3  },
+                      {name = "Anti Tank", inf = 2, at = 6  },
+                      {name = "Mortar Squad", mortar = 6 },
+                      {name = "Jtac Group", inf = 6, mg = 3, jtac = 1 },
     -- {name = "Mortar Squad Red", inf = 2, mortar = 5, side =1 }, --would make a group loadable by RED only
-}
+} 
+
+ctld.loadableGroupsbyType = {}
+
+ctld.loadableGroupsbyType['UH-1H'] = {
+                        {name = "Standard Group", inf = 4, mg = 1, at = 1 }, -- will make a loadable group with 5 infantry, 2 MGs and 2 anti-tank for both coalitions
+                        {name = "Anti Air", inf = 3, aa = 3  },
+                        {name = "Anti Tank", inf = 2, at = 4  },
+                        {name = "Mortar Squad", mortar = 6 },
+                        {name = "Jtac Group", inf = 4, mg = 1, jtac = 1 },
+                      }
+ctld.loadableGroupsbyType['Mi-8MT'] = {
+                        {name = "Standard Group", inf = 8, mg = 2, at = 2 }, -- will make a loadable group with 5 infantry, 2 MGs and 2 anti-tank for both coalitions
+                        {name = "Anti Air", inf = 6, aa = 6  },
+                        {name = "Anti Tank", inf = 6, at = 6  },
+                        {name = "Mortar Squad", mortar = 6 },
+                        {name = "Jtac Group", inf = 8, mg = 3, jtac = 1 },
+                      }
+                      
+ctld.loadableGroupsbyType["SA342Mistral"] = {
+                        {name = "Standard Group", inf = 2, mg = 0, at = 0 }, -- will make a loadable group with 5 infantry, 2 MGs and 2 anti-tank for both coalitions
+                        {name = "Anti Air", inf = 1, aa = 1  },
+                        {name = "Anti Tank", inf = 1, at = 1  },
+                        {name = "Mortar Squad", mortar = 2 },
+                        {name = "Jtac Group", inf = 1, mg = 0, at = 0, jtac = 1 },
+                      }
+ctld.loadableGroupsbyType["SA342L"] = ctld.loadableGroupsbyType["SA342Mistral"]                       
+ctld.loadableGroupsbyType["SA342M"] = ctld.loadableGroupsbyType["SA342Mistral"]                      
+ctld.loadableGroupsbyType["SA342Minigun"] = {
+                        {name = "Anti Air", inf = 0, aa = 1  },
+                        {name = "Mortar Squad", mortar = 1 },
+                        {name = "Jtac Group", inf = 0, mg = 0, at = 0, jtac = 1 },
+                      }                      
+ 
+     
+                           
+
+
+--tupper end
 
 -- ************** SPAWNABLE CRATES ******************
 -- Weights must be unique as we use the weight to change the cargo to the correct unit
@@ -488,7 +497,17 @@ ctld.spawnableCrates = {
 
         { weight = 800, desc = "FOB Crate - Small", unit = "FOB-SMALL" }, -- Builds a FOB! - requires 3 * ctld.cratesRequiredForFOB
     },
-    ["AA Crates"] = {
+    ["Supplies"] = {
+        { weight = 611, desc = "Net Cargo (6-900kg)", unit = "uh1h_cargo" },
+        { weight = 485, desc = "Gasoline (4-500 kg)", unit = "f_bar_cargo" },        
+        { weight = 901, desc = "Ammo Box (7-1200 kg)", unit = "ammo_box_cargo" }, 
+        { weight = 942, desc = "Oil Tank (7-1200 kg)", unit = "oiltank_cargo" }, 
+        { weight = 1200, desc = "Fuel Tank (7-1200 kg)", unit = "oiltank_cargo" },
+        { weight = 3802, desc = "Huge ISO (3-4000 kg)", unit = "iso_container_cargo" }, 
+        { weight = 2310, desc = "Small ISO (22-2400 kg)", unit = "bw_container_cargo" },   
+        { weight = 2311, desc = "Pipes (3000-4350 kg)", unit = "pipes_small_cargo" },   
+     },
+   --[[ ["AA Crates"] = {
         { weight = 50, desc = "Stinger", unit = "Stinger manpad", side = 2 },
         { weight = 55, desc = "Igla", unit = "SA-18 Igla manpad", side = 1 },
 
@@ -518,7 +537,9 @@ ctld.spawnableCrates = {
         { weight = 405, desc = "Strela-1 9P31", unit = "Strela-1 9P31", side = 1, cratesRequired = 3 },
         { weight = 400, desc = "M1097 Avenger", unit = "M1097 Avenger", side = 2, cratesRequired = 3 },
 
-    },
+    },]]
+    
+    
 }
 
 -- if the unit is on this list, it will be made into a JTAC when deployed
@@ -565,6 +586,8 @@ end
 -- ctld.spawnGroupAtTrigger("blue", {mg=1,at=2,aa=3,inf=4,mortar=5},"spawn2", 2000)
 -- Spawns 1 machine gun, 2 anti tank, 3 anti air, 4 standard soldiers and 5 mortars
 --
+
+	
 function ctld.spawnGroupAtTrigger(_groupSide, _number, _triggerName, _searchRadius)
     local _spawnTrigger = trigger.misc.getZone(_triggerName) -- trigger to use as reference position
 
@@ -696,7 +719,7 @@ function ctld.cratesInZone(_zone, _flagNumber)
 
                 local _dist = ctld.getDistance(_crate:getPoint(), _zonePos)
 
-                if _dist <= _triggerZone.radius then
+                if _dist <= _triggerZone.radius  then
                     _crateCount = _crateCount + 1
                 end
             end
@@ -824,7 +847,7 @@ function ctld.countDroppedGroupsInZone(_zone, _blueFlag, _redFlag)
                 local _zonePos = mist.utils.zoneToVec3(_zone)
                 local _dist = ctld.getDistance(_groupUnits[1]:getPoint(), _zonePos)
 
-                if _dist <= _triggerZone.radius then
+                if _dist <= _triggerZone.radius  then
 
                     if (_groupUnits[1]:getCoalition() == 1) then
                         _redCount = _redCount + 1;
@@ -874,7 +897,7 @@ function ctld.countDroppedUnitsInZone(_zone, _blueFlag, _redFlag)
                 for _,_unit in pairs(_groupUnits) do
                     local _dist = ctld.getDistance(_unit:getPoint(), _zonePos)
 
-                    if _dist <= _triggerZone.radius then
+                    if _dist <= _triggerZone.radius  then
 
                         if (_unit:getCoalition() == 1) then
                             _redCount = _redCount + 1;
@@ -1347,6 +1370,10 @@ function ctld.spawnCrateStatic(_country, _unitId, _point, _name, _weight,_side)
 
     local _crate
     local _spawnedCrate
+    
+    local shapename = nil
+    local cargotype = nil
+    local weight    = nil
 
     if ctld.staticBugWorkaround and ctld.slingLoad == false then
         local _groupId = ctld.getNextGroupId()
@@ -1376,69 +1403,82 @@ function ctld.spawnCrateStatic(_country, _unitId, _point, _name, _weight,_side)
 
         _spawnedCrate = Unit.getByName(_name)
     else
-
+       
         if ctld.slingLoad then
-            _crate = {
-                ["category"] = "Cargos", --now plurar
-                ["shape_name"] = "bw_container_cargo", --new slingloadable container
-                ["type"] = "container_cargo", --new type
-               -- ["unitId"] = _unitId,
-                ["y"] = _point.z,
-                ["x"] = _point.x,
-                ["mass"] = _weight,
-                ["name"] = _name,
-                ["canCargo"] = true,
-                ["heading"] = 0,
-                --            ["displayName"] = "name 2", -- getCargoDisplayName function exists but no way to set the variable
-                --            ["DisplayName"] = "name 2",
-                --            ["cargoDisplayName"] = "cargo123",
-                --            ["CargoDisplayName"] = "cargo123",
-            }
+           if string.match(_name, "Gasoline") then
+                shapename = "barrels_cargo"
+                cargotype = "barrels_cargo"
+                weight = math.random(480,502)
+            elseif string.match(_name, "Ammo Box") then
+                shapename = "ammo_box_cargo"
+                cargotype = "ammo_cargo"
+                weight = math.random(700,1175)
+            elseif string.match(_name, "Oil Tank") then
+                shapename = "oiltank_cargo"
+                cargotype = "oiltank_cargo"
+                weight = math.random(720,1235)
+            elseif string.match(_name, "Fuel Tank") then
+                shapename = "fueltank_cargo"
+                cargotype = "fueltank_cargo"
+                weight = math.random(700,1175)  
+            elseif string.match(_name, "Huge ISO") then          
+                shapename = "iso_container_cargo"
+                cargotype = "iso_container"
+                weight = math.random(3800,3975)
+            elseif string.match(_name, "Small ISO") then          
+                shapename = "iso_container_small_cargo"
+                cargotype = "iso_container_small"
+                weight = math.random(2200,2388)
+            elseif string.match(_name, "Pipes") then          
+                shapename = "pipes_small_cargo"
+                cargotype = "pipes_small_cargo"
+                weight = math.random(3000,4350)
+            elseif string.match(_name, "Net Cargo") then
+                shapename = "ab-212_cargo"
+                cargotype = "uh1h_cargo"
+                weight = math.random(600,900)
+            else
+              _crate = {
+                      ["category"] = "Cargos", --now plurar
+                      ["shape_name"] = "bw_container_cargo", --new slingloadable container
+                      ["type"] = "container_cargo", --new type
+                     -- ["unitId"] = _unitId,
+                      ["y"] = _point.z,
+                      ["x"] = _point.x,
+                      ["mass"] = _weight,
+                      ["name"] = _name,
+                      ["canCargo"] = true,
+                      ["heading"] = 0,
+                      --            ["displayName"] = "name 2", -- getCargoDisplayName function exists but no way to set the variable
+                      --            ["DisplayName"] = "name 2",
+                      --            ["cargoDisplayName"] = "cargo123",
+                      --            ["CargoDisplayName"] = "cargo123",
+                  }
+            end
+            
+            if shapename ~= nil then
+                _crate = {
+                    ["category"] = "Cargos", --now plurar
+                    ["shape_name"] = shapename, --new slingloadable container
+                    ["type"] = cargotype, --new type
+                   -- ["unitId"] = _unitId,
+                    ["y"] = _point.z,
+                    ["x"] = _point.x,
+                    ["mass"] = weight,
+                    ["name"] = _name,
+                    ["canCargo"] = true,
+                    ["heading"] = 0,
+                    --            ["displayName"] = "name 2", -- getCargoDisplayName function exists but no way to set the variable
+                    --            ["DisplayName"] = "name 2",
+                    --            ["cargoDisplayName"] = "cargo123",
+                    --            ["CargoDisplayName"] = "cargo123",
+                }
+            end  
+                    
+            
+            
         
---[[ Placeholder for different type of cargo containers. Let's say pipes and trunks, fuel for FOB building
-                        ["shape_name"] = "ab-212_cargo",
-			["type"] = "uh1h_cargo" --new type for the container previously used
-			
-			["shape_name"] = "ammo_box_cargo",
-                        ["type"] = "ammo_cargo",
-			
-			["shape_name"] = "barrels_cargo",
-                        ["type"] = "barrels_cargo",
-
-                        ["shape_name"] = "bw_container_cargo",
-                        ["type"] = "container_cargo",
-			
-                        ["shape_name"] = "f_bar_cargo",
-                        ["type"] = "f_bar_cargo",
-			
-			["shape_name"] = "fueltank_cargo",
-                        ["type"] = "fueltank_cargo",
-			
-			["shape_name"] = "iso_container_cargo",
-			["type"] = "iso_container",
-			
-			["shape_name"] = "iso_container_small_cargo",
-			["type"] = "iso_container_small",
-			
-			["shape_name"] = "oiltank_cargo",
-                        ["type"] = "oiltank_cargo",
-                        
-			["shape_name"] = "pipes_big_cargo",
-                        ["type"] = "pipes_big_cargo",			
-			
-			["shape_name"] = "pipes_small_cargo",
-			["type"] = "pipes_small_cargo",
-			
-			["shape_name"] = "tetrapod_cargo",
-			["type"] = "tetrapod_cargo",
-			
-			["shape_name"] = "trunks_long_cargo",
-			["type"] = "trunks_long_cargo",
-			
-			["shape_name"] = "trunks_small_cargo",
-			["type"] = "trunks_small_cargo",
-]]--
-	else	
+	     else	
             _crate = {
                 ["shape_name"] = "GeneratorF",
                 ["type"] = "GeneratorF",
@@ -1460,12 +1500,13 @@ function ctld.spawnCrateStatic(_country, _unitId, _point, _name, _weight,_side)
 
 
     local _crateType = ctld.crateLookupTable[tostring(_weight)]
-
-    if _side == 1 then
-        ctld.spawnedCratesRED[_name] =_crateType
-    else
-        ctld.spawnedCratesBLUE[_name] = _crateType
-    end
+    if shapename == nil then   -- crates with shape can't be unpacked..
+        if _side == 1 then
+            ctld.spawnedCratesRED[_name] =_crateType
+        else
+            ctld.spawnedCratesBLUE[_name] = _crateType
+        end
+     end
 
     return _spawnedCrate
 end
@@ -1641,7 +1682,8 @@ function ctld.troopsOnboard(_heli, _troops)
                 return true
             else
                 return false
-            end
+            end 
+         
         else
 
             if _onboard.vehicles ~= nil and _onboard.vehicles.units ~= nil and #_onboard.vehicles.units > 0 then
@@ -1676,7 +1718,7 @@ function ctld.inExtractZone(_heli)
         --get distance to center
         local _dist = ctld.getDistance(_heliPoint, _zoneDetails.point)
 
-        if _dist <= _zoneDetails.radius then
+        if _dist <= _zoneDetails.radius  then
             return _zoneDetails
         end
     end
@@ -1812,7 +1854,8 @@ end
 
 
 function ctld.generateTroopTypes(_side, _countOrTemplate, _country)
-
+    
+    
     local _troops = {}
 
     if type(_countOrTemplate) == "table" then
@@ -1844,6 +1887,15 @@ function ctld.generateTroopTypes(_side, _countOrTemplate, _country)
         if _countOrTemplate.mortar then
             _troops = ctld.insertIntoTroopsArray("2B11 mortar",_countOrTemplate.mortar,_troops)
         end
+        
+          -- Tupperware Begin        (2)
+        if _countOrTemplate.jtac then
+            _troops = ctld.insertIntoTroopsArray("Soldier M249",_countOrTemplate.jtac,_troops)
+            
+            
+        end
+
+  -- Tupperware end
 
     else
         for _i = 1, _countOrTemplate do
@@ -1882,14 +1934,34 @@ function ctld.generateTroopTypes(_side, _countOrTemplate, _country)
     end
 
     local _groupId = ctld.getNextGroupId()
-    local _details = { units = _troops, groupId = _groupId, groupName = string.format("Dropped Group %i", _groupId), side = _side, country = _country }
+    local _details
+    if _countOrTemplate.jtac then
+         _details = { units = _troops, groupId = _groupId, groupName = string.format("JTAC %i", _groupId), side = _side, country = _country }
+
+    else
+        _details = { units = _troops, groupId = _groupId, groupName = string.format("Dropped Group %i", _groupId), side = _side, country = _country }    
+    end
+    
+    
 
     return _details
 end
-
+-- Tupper Begin
 --Special F10 function for players for troops
-function ctld.unloadExtractTroops(_args)
+--function ctld.unloadExtractTroops(_args)
+function ctld.unloadTroopsmenu(_args)
+    local _heli = ctld.getTransportUnit(_args[1])
 
+    if _heli == nil then
+        return false
+    end
+
+    return ctld.unloadTroops({_heli:getName(),true,true})
+
+
+end
+
+function ctld.extractTroopsmenu(_args)
     local _heli = ctld.getTransportUnit(_args[1])
 
     if _heli == nil then
@@ -1898,24 +1970,26 @@ function ctld.unloadExtractTroops(_args)
 
 
     local _extract = nil
-    if not ctld.inAir(_heli) then
+   -- if not ctld.inAir(_heli) then -- Tupp Test
         if _heli:getCoalition() == 1 then
             _extract = ctld.findNearestGroup(_heli, ctld.droppedTroopsRED)
         else
             _extract = ctld.findNearestGroup(_heli, ctld.droppedTroopsBLUE)
         end
 
-    end
+   -- end
 
-    if _extract ~= nil and not ctld.troopsOnboard(_heli, true) then
+    --if _extract ~= nil and not ctld.troopsOnboard(_heli, true) then
+     if _extract ~= nil  then
         -- search for nearest troops to pickup
         return ctld.extractTroops({_heli:getName(), true})
-    else
-        return ctld.unloadTroops({_heli:getName(),true,true})
     end
 
 
 end
+
+
+-- Tupper End
 
 -- load troops onto vehicle
 function ctld.loadTroops(_heli, _troops, _numberOrTemplate)
@@ -2088,9 +2162,14 @@ function ctld.loadTroopsFromZone(_args)
     if _heli == nil then
         return false
     end
+    if ctld.heliembarking[_heli:getName()] ~= nil then
+      return false
+    end
+    
 
     local _zone = ctld.inPickupZone(_heli)
-
+    -- Tupper begin
+    --[[
     if ctld.troopsOnboard(_heli, _troops) then
 
         if _troops then
@@ -2101,9 +2180,11 @@ function ctld.loadTroopsFromZone(_args)
 
         return false
     end
+    ]]--
+--    tupper end
 
     local _extract
-
+  --     trigger.action.outTextForCoalition(_heli:getCoalition(),"Unit Check allow extract " .. tostring(_allowExtract) , 10)
     if _allowExtract then
         -- first check for extractable troops regardless of if we're in a zone or not
         if _troops then
@@ -2124,7 +2205,9 @@ function ctld.loadTroopsFromZone(_args)
 
     if _extract ~= nil then
         -- search for nearest troops to pickup
+     
         return ctld.extractTroops({_heli:getName(), _troops})
+        
     elseif _zone.inZone == true then
 
         if _zone.limit - 1 >= 0 then
@@ -2201,6 +2284,27 @@ function ctld.unloadTroops(_args)
 
 end
 
+function ctld.counttroopsOnboard( _heliName )
+  local count = 0
+   if ctld.inTransitTroops[_heliName] ~= nil then
+         if ctld.inTransitTroops[_heliName].troops ~= nil then
+            if ctld.inTransitTroops[_heliName].troops.units ~= nil then
+               count = count + #ctld.inTransitTroops[_heliName].troops.units                     
+            end                                    
+         end
+    end
+    
+    if csar ~= nil then   
+        if csar.inTransitGroups[_heliName] then
+            for _, _group in pairs(csar.inTransitGroups[_heliName]) do
+                count = count + 1
+            end
+        end
+    end
+
+    return count
+end
+
 function ctld.extractTroops(_args)
 
     local _heli = ctld.getTransportUnit(_args[1])
@@ -2211,10 +2315,11 @@ function ctld.extractTroops(_args)
     end
 
     if ctld.inAir(_heli) then
-        return false
+   --     return false  -- LETS SEE IF WORKS THIS WAY
+   
     end
-
-    if  ctld.troopsOnboard(_heli, _troops)  then
+-- tupper begin
+--[[    if  ctld.troopsOnboard(_heli, _troops)  then
         if _troops then
             ctld.displayMessageToGroup(_heli, "You already have troops onboard.", 10)
         else
@@ -2222,7 +2327,7 @@ function ctld.extractTroops(_args)
         end
 
         return false
-    end
+    end ]]
 
     local _onboard = ctld.inTransitTroops[_heli:getName()]
 
@@ -2248,15 +2353,25 @@ function ctld.extractTroops(_args)
             local _limit = ctld.getTransportLimit(_heli:getTypeName())
 
             local _size =  #_extractTroops.group:getUnits()
-
-            if _limit < #_extractTroops.group:getUnits() then
-
-                ctld.displayMessageToGroup(_heli, "Sorry - The group of ".._size.." is too large to fit. \n\nLimit is ".._limit.." for ".._heli:getTypeName(), 20)
-
-                return
+-- Tupper Begin - Troop 1 by 1
+            
+            if _onboard.troops ~= nil then
+            -- There are troops on board, check if it's full only.
+              if _limit == ctld.counttroopsOnboard( _heli:getName() ) then
+                 ctld.displayMessageToGroup(_heli, "Your Helicopter it's at full capacity ", 20)
+                 return false
+              end
             end
 
+--[[
+            if _limit < #_extractTroops.group:getUnits() then
 
+                ctld.displayMessageToGroup(_heli, "The group of ".._size.." is too large to fit. \n\nLimit is ".._limit.." for ".._heli:getTypeName(), 20)
+                return
+            end ]]--
+-- Tupper end            
+-- Tupper troops run at extract beg ------------------------------------------------------------------------
+--[[
             _onboard.troops = _extractTroops.details
 
             trigger.action.outTextForCoalition(_heli:getCoalition(), ctld.getPlayerNameOrType(_heli) .. " extracted troops in " .. _heli:getTypeName() .. " from combat", 10)
@@ -2273,6 +2388,35 @@ function ctld.extractTroops(_args)
             _extractTroops.group:destroy()
 
             _extracted = true
+			]]--
+      
+  --    Message to notify "On the way"  			
+  --      get time aprox of embarking
+        local _units = _extractTroops.group:getUnits()
+        local _leader = _units[1]
+  
+        local _heliPoint = _heli:getPoint()
+        local _leaderPos = _leader:getPoint()
+  
+        local _distance = ctld.getDistance(_heliPoint, _leaderPos)
+        
+        local _time = math.floor( (_distance * ctld.loadtimemax ) / ctld.maxExtractDistance )   
+        ctld.displayMessageToGroup(_heli, "Roger, On the Way! " .. _time ..  " Seconds", 15)
+        
+--        ctld.inTransitTroops[_heli:getName()] = nil 
+        --trigger.action.outTextForCoalition(_heli:getCoalition(), "on the way", 10) -- delete  -- Test for AI
+     
+        ctld.embarking[_extractTroops.group:getName()] = true
+        ctld.heliembarking[_heli:getName()] = true
+      
+        local _dest = _heliPoint
+        _dest = { x = _dest.x + 5, _y = _dest.y + 5, z = _dest.z + 0.5 }
+         ctld.orderGroupToevacToPoint(_leader, _dest)
+  
+        timer.scheduleFunction(ctld.extracttroopsAction, { _heli , _extractTroops , _onboard}, timer.getTime() + _time)
+       
+			
+-- Tupper troops run at extract end ------------------------------------------------------------------------
         else
             _onboard.troops = nil
             ctld.displayMessageToGroup(_heli, "No extractable troops nearby!", 20)
@@ -2313,13 +2457,140 @@ function ctld.extractTroops(_args)
             _onboard.vehicles = nil
             ctld.displayMessageToGroup(_heli, "No extractable vehicles nearby!", 20)
         end
+         ctld.inTransitTroops[_heli:getName()] = _onboard
     end
 
-    ctld.inTransitTroops[_heli:getName()] = _onboard
+   
 
     return _extracted
 end
 
+function ctld.extracttroopsAction( _args )
+    
+   local  _heli = _args[1]
+   local _extractTroops = _args[2]
+   local  _onboard   = _args[3]
+    --Add back just in case of failure
+      
+   
+   if ctld.inAir(_heli) then
+     ctld.embarking[_extractTroops.group:getName()] = nil
+     ctld.heliembarking[_heli:getName()] = nil
+     return false
+   end
+ 
+   -- Loop each unit
+    
+      if  ctld.inTransitTroops[_heli:getName()] == nil then
+        _onboard.troops = _extractTroops.details
+        ctld.inTransitTroops[_heli:getName()] = { troops = {}, vehicles = nil}
+        
+        ctld.inTransitTroops[_heli:getName()].troops = _onboard.troops 
+        local _groupId = ctld.getNextGroupId()      
+        ctld.inTransitTroops[_heli:getName()].troops.groupId = _groupId
+        ctld.inTransitTroops[_heli:getName()].troops.units  = {}     
+        if  string.match( _onboard.troops.groupName, "JTAC") then       
+          ctld.inTransitTroops[_heli:getName()].troops.groupName = string.format("JTAC %i", _groupId)
+        else
+          ctld.inTransitTroops[_heli:getName()].troops.groupName = string.format("Dropped Group %i", _groupId)       
+        end
+        
+        --trigger.action.outTextForCoalition(_heli:getCoalition(), "Units init " .. tostring(#ctld.inTransitTroops[_heli:getName()].troops.units), 10)
+      else
+        if  ctld.inTransitTroops[_heli:getName()].troops == nil then
+          _onboard.troops = _extractTroops.details
+          ctld.inTransitTroops[_heli:getName()].troops = _onboard.troops 
+          ctld.inTransitTroops[_heli:getName()].troops.units  = {}
+          local _groupId = ctld.getNextGroupId()      
+          ctld.inTransitTroops[_heli:getName()].troops.groupId = _groupId
+          ctld.inTransitTroops[_heli:getName()].troops.units  = {}     
+          if  string.match( _onboard.troops.groupName, "JTAC") then       
+              ctld.inTransitTroops[_heli:getName()].troops.groupName = string.format("JTAC %i", _groupId)
+          else
+              ctld.inTransitTroops[_heli:getName()].troops.groupName = string.format("Dropped Group %i", _groupId)       
+          end
+          
+        else
+          if  string.match( _onboard.troops.groupName, "JTAC") then       
+            ctld.inTransitTroops[_heli:getName()].troops.groupName = string.format("JTAC %i", ctld.inTransitTroops[_heli:getName()].troops.groupId)
+          end
+        end
+      end
+     
+      
+      local _units = _extractTroops.group:getUnits()
+      local unitid =  mist.getNextUnitId()
+      local _unitDetails = { type = _units[1]:getTypeName(), unitId = unitid, name = string.format("Dropped unit %i", unitid ) }
+      table.insert( ctld.inTransitTroops[_heli:getName()].troops.units, _unitDetails)
+      if #_units > 1 then
+      --    local _unitDetails = { type = _units[1]:getTypeName(), unitId = _units[1]:getID(), name = _units[1]:getName() }
+      --    table.insert( ctld.inTransitTroops[_heli:getName()].troops.units, _unitDetails) 
+          _units[1]:destroy()
+          
+--          check capacity        
+            local _limit = ctld.getTransportLimit(_heli:getTypeName())
+            local _size =  #_extractTroops.group:getUnits()
+            
+          
+            -- There are troops on board, check if it's full only.
+              if _limit <= ctld.counttroopsOnboard( _heli:getName() ) then
+                 ctld.displayMessageToGroup(_heli, "No more room for troops", 20)
+                 
+              else
+                 timer.scheduleFunction(ctld.extracttroopsAction, { _heli , _extractTroops , _onboard}, timer.getTime() + 5)
+                 return false              
+              end
+     -- else
+      --trigger.action.outTextForCoalition(_heli:getCoalition(), "Unit Check else", 10)
+      --    local unitid =  mist.getNextUnitId()
+      --    local _unitDetails = { type = _units[1]:getTypeName(), unitId = unitid, name = string.format("Dropped unit %i", unitid ) }
+      --    table.insert( ctld.inTransitTroops[_heli:getName()].troops.units, _unitDetails)
+         
+      end
+   -- 
+    
+      ctld.embarking[_extractTroops.group:getName()] = nil
+      ctld.heliembarking[_heli:getName()] = nil
+  
+  if #_units > 1 then   -- Group Split
+
+--[[      for key, value in pairs (ctld.inTransitTroops[_heli:getName()].troops.units) do
+         ctld.inTransitTroops[_heli:getName()].troops.units[key].unitId =  mist.getNextUnitId()
+         ctld.inTransitTroops[_heli:getName()].troops.units[key].name = string.format("Dropped unit %i", ctld.inTransitTroops[_heli:getName()].troops.units[key].unitId) 
+         
+      end  ]]--
+      
+      trigger.action.outTextForCoalition(_heli:getCoalition(), ctld.getPlayerNameOrType(_heli) .. " extracted troops from combat " .. tostring(#_units - 1) .. " Left"  , 10)
+      
+        
+  else
+  
+  
+        trigger.action.outTextForCoalition(_heli:getCoalition(), ctld.getPlayerNameOrType(_heli) .. " extracted troops in " .. _heli:getTypeName() .. " from combat", 10)
+    
+      if _heli:getCoalition() == 1 then
+          ctld.droppedTroopsRED[_extractTroops.group:getName()] = nil
+      else
+          ctld.droppedTroopsBLUE[_extractTroops.group:getName()] = nil
+      end
+    
+      ctld.processCallback({unit = _heli, extracted = _extractTroops, action = "extract_troops"})
+    
+      --remove
+      _extractTroops.group:destroy()
+    
+      _extracted = true
+        
+      
+      
+  
+  end
+--    local _details = { units = _troops, groupId = _groupId, groupName = string.format("Dropped Group %i", _groupId), side = _side, country = _country }
+
+
+
+
+end
 
 function ctld.checkTroopStatus(_args)
 
@@ -2376,7 +2647,7 @@ function ctld.checkTransportStatus()
 
     timer.scheduleFunction(ctld.checkTransportStatus, nil, timer.getTime() + 3)
 
-    for _, _name in ipairs(ctld.transportPilotNames) do
+    for _key, _name in ipairs(ctld.transportPilotNames) do
 
         local _transUnit = ctld.getTransportUnit(_name)
 
@@ -2385,6 +2656,9 @@ function ctld.checkTransportStatus()
             ctld.inTransitTroops[_name] = nil
             ctld.inTransitFOBCrates[_name] = nil
             ctld.inTransitSlingLoadCrates[_name] = nil
+            --Tupper Begin
+            ctld.transportPilotNames[_key] = nil
+            -- Tupper end
         end
     end
 end
@@ -2703,7 +2977,7 @@ function ctld.getFOBPositionString(_fob)
 
     local _lat, _lon = coord.LOtoLL(_fob:getPosition().p)
 
-    local _latLngStr = mist.tostringLL(_lat, _lon, 3, ctld.location_DMS)
+    local _latLngStr = mist.tostringLL(_lat, _lon, 3, false)
 
     --   local _mgrsString = mist.tostringMGRS(coord.LLtoMGRS(coord.LOtoLL(_fob:getPosition().p)), 5)
 
@@ -3182,7 +3456,7 @@ function ctld.createRadioBeacon(_point, _coalition, _country, _name, _batteryTim
 
     local _lat, _lon = coord.LOtoLL(_point)
 
-    local _latLngStr = mist.tostringLL(_lat, _lon, 3, ctld.location_DMS)
+    local _latLngStr = mist.tostringLL(_lat, _lon, 3, false)
 
     --local _mgrsString = mist.tostringMGRS(coord.LLtoMGRS(coord.LOtoLL(_point)), 5)
 
@@ -4014,6 +4288,20 @@ function ctld.spawnDroppedGroup(_point, _details, _spawnBehind, _maxSearch)
     _group.country = _details.country;
 
     local _spawnedGroup = Group.getByName(mist.dynAdd(_group).name)
+    
+        --Tupperware begin  (4)
+      local _name1 = _spawnedGroup:getName()
+      
+      if string.match(_name1, "JTAC") then
+          local _code = table.remove(ctld.jtacGeneratedLaserCodes, 1)
+         table.insert(ctld.jtacGeneratedLaserCodes, _code)
+         ctld.JTACAutoLase(_name1, _code)
+         local con = _spawnedGroup:getController()
+         --AI.Option.Ground.val.ROE
+         con:setOption(AI.Option.Ground.id.ROE, AI.Option.Ground.val.ROE.RETURN_FIRE)  -- Set to only return fire
+        
+        -- return _spawnedGroup
+      end     
 
     --local _spawnedGroup = coalition.addGroup(_details.country, Group.Category.GROUND, _group)
 
@@ -4026,7 +4314,7 @@ function ctld.spawnDroppedGroup(_point, _details, _spawnBehind, _maxSearch)
     local _wpZone = ctld.inWaypointZone(_point,_spawnedGroup:getCoalition())
 
     if _wpZone.inZone then
-        ctld.orderGroupToMoveToPoint(_spawnedGroup:getUnit(1), _wpZone.point)
+        ctld.orderGroupToMoveToPoint(_spawnedGroup:getUnit(1), _wpZone.point, _wpZone.formation)
         env.info("Heading to waypoint - In Zone ".._wpZone.name)
     else
         local _enemyPos = ctld.findNearestEnemy(_details.side, _point, _maxSearch)
@@ -4109,9 +4397,11 @@ function ctld.findNearestGroup(_heli, _groups)
 
     for _, _groupName in pairs(_groups) do
 
+        if ctld.embarking[_groupName] == nil then -- tupper ctld run troop
         local _group = Group.getByName(_groupName)
+        
 
-        if _group ~= nil then
+        if _group ~= nil then  
             local _units = _group:getUnits()
 
             if _units ~= nil and #_units > 0 then
@@ -4146,6 +4436,7 @@ function ctld.findNearestGroup(_heli, _groups)
                     end
                 end
             end
+        end
         end
     end
 
@@ -4197,13 +4488,17 @@ function ctld.addEWRTask(_group)
 
 end
 
-function ctld.orderGroupToMoveToPoint(_leader, _destination)
+function ctld.orderGroupToMoveToPoint(_leader, _destination, _formation)
 
     local _group = _leader:getGroup()
+     local _formation2 =  'Off Road'
+    if _formation ~= nil then
+        _formation2 =  _formation
+    end
 
     local _path = {}
-    table.insert(_path, mist.ground.buildWP(_leader:getPoint(), 'Off Road', 50))
-    table.insert(_path, mist.ground.buildWP(_destination, 'Off Road', 50))
+    table.insert(_path, mist.ground.buildWP(_leader:getPoint(), _formation2, 50))
+    table.insert(_path, mist.ground.buildWP(_destination, _formation2, 50))
 
     local _mission = {
         id = 'Mission',
@@ -4229,6 +4524,43 @@ function ctld.orderGroupToMoveToPoint(_leader, _destination)
         , {_group:getName(), _mission}, timer.getTime() + 2)
 
 end
+
+-- TUPPER running troop beg
+
+function ctld.orderGroupToevacToPoint(_leader, _destination)
+
+    local _group = _leader:getGroup()
+
+    local _path = {}
+    table.insert(_path, mist.ground.buildWP(_leader:getPoint(), 'Off Road', 50))
+    table.insert(_path, mist.ground.buildWP(_destination, 'Off Road', 50))
+
+    local _mission = {
+        id = 'Mission',
+        params = {
+            route = {
+                points =_path
+            },
+        },
+    }
+
+
+    -- delayed 2 second to work around bug
+    timer.scheduleFunction(function(_arg)
+        local _grp = ctld.getAliveGroup(_arg[1])
+
+        if _grp ~= nil then
+            local _controller = _grp:getController();
+            Controller.setOption(_controller, AI.Option.Ground.id.ALARM_STATE, AI.Option.Ground.val.ALARM_STATE.GREEN)
+            Controller.setOption(_controller, AI.Option.Ground.id.ROE, AI.Option.Ground.val.ROE.WEAPON_HOLD)
+            _controller:setTask(_arg[2])
+        end
+    end
+        , {_group:getName(), _mission}, timer.getTime() + 2)
+
+end
+
+-- tupper running troop end
 
 -- are we in pickup zone
 function ctld.inPickupZone(_heli)
@@ -4261,7 +4593,7 @@ function ctld.inPickupZone(_heli)
 
             local _dist = ctld.getDistance(_heliPoint, _triggerZone.point)
 
-            if _dist <= _triggerZone.radius then
+            if _dist <= _triggerZone.radius  then
                 local _heliCoalition = _heli:getCoalition()
                 if _zoneDetails[4] == 1 and (_zoneDetails[5] == _heliCoalition or _zoneDetails[5] == 0) then
                     return { inZone = true, limit = _zoneDetails[3], index = _i }
@@ -4325,7 +4657,7 @@ function ctld.inDropoffZone(_heli)
 
             local _dist = ctld.getDistance(_heliPoint, _triggerZone.point)
 
-            if _dist <= _triggerZone.radius then
+            if _dist <= _triggerZone.radius  then
                 return true
             end
         end
@@ -4334,6 +4666,16 @@ function ctld.inDropoffZone(_heli)
     return false
 end
 
+function ctld.mysplit (inputstr, sep)
+        if sep == nil then
+                sep = "%s"
+        end
+        local t={}
+        for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
+                table.insert(t, str)
+        end
+        return t
+end
 -- are we in a waypoint zone
 function ctld.inWaypointZone(_point,_coalition)
 
@@ -4348,10 +4690,44 @@ function ctld.inWaypointZone(_point,_coalition)
 
             local _dist = ctld.getDistance(_point, _triggerZone.point)
 
-            if _dist <= _triggerZone.radius then
-                return {inZone = true, point = _triggerZone.point, name = _zoneDetails[1]}
+            if _dist <= _triggerZone.radius  then
+                return {inZone = true, point = _triggerZone.point, name = _zoneDetails[1], formation = _zoneDetails[5]}
             end
         end
+    end
+-- Tupper
+
+    local f10marks = world.getMarkPanels( )  
+    local _formation = "Off Road"
+     
+    for key, _mark in pairs (f10marks) do
+      local text = string.upper(_mark.text)
+      
+      if string.match(text, "WPZONE") then
+       
+        local tab = ctld.mysplit(text, ",")
+        local radius, state
+        if tab[2] ~= nil then
+          radius = tonumber(tab[2])
+        else
+          radius = 2000
+        end
+        if tab[3] ~= nil then
+          if tab[3] == 'COL' then
+            _formation = "Rank"
+          end
+        end
+        
+        local pos = _mark.pos
+     
+        local _dist = ctld.getDistance(_point, pos)
+
+        if _dist <= radius then
+           return {inZone = true, point = pos, name = "F10Mark", formation = _formation}
+        end
+        
+
+      end
     end
 
     return {inZone = false}
@@ -4588,7 +4964,8 @@ function ctld.checkAIStatus()
             if _unit ~= nil and _unit:getPlayerName() == nil then
                 local _zone = ctld.inPickupZone(_unit)
                 --  env.error("Checking.. ".._unit:getName())
-                if _zone.inZone == true and not ctld.troopsOnboard(_unit, true) then
+                --if _zone.inZone == true and not ctld.troopsOnboard(_unit, true) then
+                if _zone.inZone == true then
                     --   env.error("in zone, loading.. ".._unit:getName())
 
                     if ctld.allowRandomAiTeamPickups == true then
@@ -4653,6 +5030,39 @@ function ctld.getUnitActions(_unitType)
 
 end
 
+-- Tupper  Begin
+
+function ctld.checkForHelis(  )
+
+   local _allHeliGroups = coalition.getGroups(2, Group.Category.HELICOPTER)
+   timer.scheduleFunction(ctld.checkForHelis, nil, timer.getTime() + 10)
+   if _allHeliGroups ~= nil then
+       for _key, _group in pairs (_allHeliGroups) do
+        local _unit = _group:getUnit(1) -- Asume that there is only one unit in the flight for players
+          if _unit:isExist() ~= true then
+              return
+          end         
+           
+           --[[if _unit:getPlayerName() ~= nil then
+                if _unit ~= nil
+                and _unit:getLife() > 1
+                and _unit:isActive() then
+                  spotter.addHeli(_unit, _group:getID())   
+                end
+          end]]--
+          if ctld.transportPilotNames[_unit:getName()] == nil then
+            ctld.transportPilotNames[_unit:getName()] = _unit:getName() 
+          end
+          
+       end
+   end
+   ctld.addF10MenuOptions()
+  
+end
+
+-- Tupper End
+
+
 -- Adds menuitem to all heli units that are active
 function ctld.addF10MenuOptions()
     -- Loop through all Heli units
@@ -4681,20 +5091,31 @@ function ctld.addF10MenuOptions()
                         if _unitActions.troops then
 
                             local _troopCommandsPath = missionCommands.addSubMenuForGroup(_groupId, "Troop Transport", _rootPath)
-
-                            missionCommands.addCommandForGroup(_groupId, "Unload / Extract Troops", _troopCommandsPath, ctld.unloadExtractTroops, { _unitName })
-
+-- Tupper Begin
+                            missionCommands.addCommandForGroup(_groupId, "Unload Troops", _troopCommandsPath, ctld.unloadTroopsmenu, { _unitName })
+                            
+                            missionCommands.addCommandForGroup(_groupId, "Pickup Troops", _troopCommandsPath, ctld.extractTroopsmenu, { _unitName })
+-- Tupper End
                             missionCommands.addCommandForGroup(_groupId, "Check Cargo", _troopCommandsPath, ctld.checkTroopStatus, { _unitName })
 
                             -- local _loadPath = missionCommands.addSubMenuForGroup(_groupId, "Load From Zone", _troopCommandsPath)
-                            for _,_loadGroup in pairs(ctld.loadableGroups) do
-                                if not _loadGroup.side or _loadGroup.side == _unit:getCoalition() then
-
-                                    -- check size & unit
-                                    if ctld.getTransportLimit(_unit:getTypeName()) >= _loadGroup.total then
-                                        missionCommands.addCommandForGroup(_groupId, "Load ".._loadGroup.name, _troopCommandsPath, ctld.loadTroopsFromZone, { _unitName, true,_loadGroup,false })
-                                    end
-                                end
+                            if ctld.loadableGroupsbyType[_unit:getTypeName()] ~= nil then
+                              
+                              for _,_loadGroup in pairs(ctld.loadableGroupsbyType[_unit:getTypeName()]) do
+                                  if not _loadGroup.side or _loadGroup.side == _unit:getCoalition() then
+                                    missionCommands.addCommandForGroup(_groupId, "Load ".._loadGroup.name, _troopCommandsPath, ctld.loadTroopsFromZone, { _unitName, true,_loadGroup,false })
+                                  end
+                              end
+                            
+                            else
+                              for _,_loadGroup in pairs(ctld.loadableGroups) do
+                                  if not _loadGroup.side or _loadGroup.side == _unit:getCoalition() then
+                                      -- check size & unit
+                                      if ctld.getTransportLimit(_unit:getTypeName()) >= _loadGroup.total then
+                                          missionCommands.addCommandForGroup(_groupId, "Load ".._loadGroup.name, _troopCommandsPath, ctld.loadTroopsFromZone, { _unitName, true,_loadGroup,false })
+                                      end
+                                  end
+                              end
                             end
 
                             if ctld.unitCanCarryVehicles(_unit) then
@@ -5755,7 +6176,7 @@ function ctld.getPositionString(_unit)
 
     local _lat, _lon = coord.LOtoLL(_unit:getPosition().p)
 
-    local _latLngStr = mist.tostringLL(_lat, _lon, 3, ctld.location_DMS)
+    local _latLngStr = mist.tostringLL(_lat, _lon, 3, false)
 
     local _mgrsString = mist.tostringMGRS(coord.LLtoMGRS(coord.LOtoLL(_unit:getPosition().p)), 5)
 
@@ -5990,6 +6411,133 @@ for _,_loadGroup in pairs(ctld.loadableGroups) do
 
 end
 
+-- Tupper Action zones 
+function azdroppedTroops( _args )
+--({unit = _heli, unloaded = _droppedTroops, action = "dropped_troops"})
+  local _heli = _args.unit
+  local _troops = _args.unloaded
+  local _action = _args.action
+  
+  if not string.match(_action, "dropped_troops") then
+    return false
+  end
+  
+  --trigger.action.outTextForCoalition(_heli:getCoalition(), "Callback Working", 10) -- DEBUG PURPOSSES
+
+  local _inzone = az.inactionZone(_troops:getUnit(1):getPoint())
+  
+  if _inzone.inZone == false then
+    return
+  end
+  
+  local _droppedgroupname = _troops:getName()
+  az.groupsdropped[_droppedgroupname] = {}
+    az.groupsdropped[_droppedgroupname].droppoint = _troops:getUnit(1):getPoint()
+  az.groupsdropped[_droppedgroupname].distance = _inzone.distance
+  az.groupsdropped[_droppedgroupname].zone = _inzone.name
+  az.groupsdropped[_droppedgroupname].zonepoint = _inzone.point
+  az.groupsdropped[_droppedgroupname].arriveflg = false
+  az.groupsdropped[_droppedgroupname].proceedflg = false
+  
+  if az.scheduled == nil then
+    -- Check zone actions every xx seconds
+    timer.scheduleFunction(az.checkActionZones, nil, timer.getTime() + 10)
+    az.scheduled = true
+  end
+  
+end
+
+function az.checkActionZones()
+ --trigger.action.outText("Check status ", 10) -- DEBUG PURPOSSES
+  for _key, _droppedGroup in pairs (az.groupsdropped) do
+    
+    local _group =  Group.getByName(_key)
+    if _group == nil then
+    -- Group is dead or extracted
+      az.groupsdropped[_key] = nil
+    else   
+      -- Group is alive
+      local _actionzone = az.getzone(_droppedGroup.zone)
+      if _droppedGroup.arriveflg == false then
+        -- Check Distance
+         local _dist = ctld.getDistance(_group:getUnit(1):getPoint(), _droppedGroup.zonepoint)
+         --if _dist == _droppedGroup.distance or _dist <= az.zoneFlgDistance then -- No change in the last 10 seconds
+         if _dist <= az.zoneFlgDistance then  
+            az.groupsdropped[_key].arriveflg = true
+            
+            -- Arrive Flag logic
+            if _actionzone.flgArrive ~= nil then
+              local _Count = trigger.misc.getUserFlag(_actionzone.flgArrive)
+              if _Count == nil then
+                _Count = 0
+              else
+                _Count = _Count + 1
+              end
+              trigger.action.setUserFlag(_actionzone.flgArrive, _Count)
+            end
+         else
+           az.groupsdropped[_key].distance = _dist
+         end
+      end
+            -- Proceed Flag
+       if _actionzone.flgproceed ~= nil then
+          local _flgval = trigger.misc.getUserFlag(_actionzone.flgproceed)
+         if _flgval == 1 and _droppedGroup.proceedflg == false then
+           az.groupsdropped[_key].proceedflg = true
+           -- Execute action
+           if _actionzone.returndropzone == true then
+              ctld.orderGroupToMoveToPoint(_group:getUnit(1), _droppedGroup.droppoint)
+           else if _actionzone.nextzone ~= nil then
+              local _nextZone = trigger.misc.getZone(_actionzone.nextzone)
+              if _nextZone  ~= nil then
+                  ctld.orderGroupToMoveToPoint(_group:getUnit(1), _nextZone.point)
+                  local _dist2 = ctld.getDistance(_group:getUnit(1):getPoint(), _nextZone.point)
+                  az.groupsdropped[_key].distance = _dist2
+                  az.groupsdropped[_key].zone = _actionzone.nextzone
+                  az.groupsdropped[_key].zonepoint = _nextZone.point
+                  az.groupsdropped[_key].arriveflg = false
+                  az.groupsdropped[_key].proceedflg = false
+              end
+           end           
+         end
+        end
+      end
+      
+    end
+  end
+   timer.scheduleFunction(az.checkActionZones, nil, timer.getTime() + 10)
+end
+
+function az.getzone(_zonename)
+    for _, _zoneDetails in pairs(az.actionZones) do
+      if _zoneDetails[1] == _zonename then
+      
+        return { flgArrive = _zoneDetails[2], flgproceed = _zoneDetails[3], returndropzone = _zoneDetails[4], nextzone = _zoneDetails[5]}
+      end
+    end
+   return nil
+end
+
+-- are we in a waypoint zone
+function az.inactionZone(_point)
+    for _, _zoneDetails in pairs(az.actionZones) do
+        local _triggerZone = trigger.misc.getZone(_zoneDetails[1])
+        --right coalition and active?
+        if _triggerZone ~= nil then
+            --get distance to center
+            local _dist = ctld.getDistance(_point, _triggerZone.point)
+            if _dist <= _triggerZone.radius  then
+               return {inZone = true, point = _triggerZone.point, distance = _dist, name = _zoneDetails[1]}
+            end
+        end
+    end
+    return {inZone = false}
+end
+
+-- End of tupper Action Zones
+
+
+
 
 -- Scheduled functions (run cyclically) -- but hold execution for a second so we can override parts
 
@@ -6000,8 +6548,10 @@ timer.scheduleFunction(function()
 
     timer.scheduleFunction(ctld.refreshRadioBeacons, nil, timer.getTime() + 5)
     timer.scheduleFunction(ctld.refreshSmoke, nil, timer.getTime() + 5)
-    timer.scheduleFunction(ctld.addF10MenuOptions, nil, timer.getTime() + 5)
-
+   -- timer.scheduleFunction(ctld.addF10MenuOptions, nil, timer.getTime() + 10)
+    -- Tupper begin
+    timer.scheduleFunction(ctld.checkForHelis, nil, timer.getTime() + 5)
+    -- Tupper end
     if ctld.enableCrates == true and ctld.slingLoad == false and ctld.hoverPickup == true then
         timer.scheduleFunction(ctld.checkHoverStatus, nil, timer.getTime() + 1)
     end
@@ -6074,6 +6624,12 @@ end
 env.info("END search for crates")
 
 env.info("CTLD READY")
+
+-- Add the call back
+
+--trigger.action.outText("Action zone Active", 10) -- DEBUG PURPOSSES
+ctld.addCallback(azdroppedTroops)
+
 
 
 --DEBUG FUNCTION
