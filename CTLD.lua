@@ -1935,11 +1935,15 @@ function ctld.generateTroopTypes(_side, _countOrTemplate, _country)
 
     local _groupId = ctld.getNextGroupId()
     local _details
-    if _countOrTemplate.jtac then
-         _details = { units = _troops, groupId = _groupId, groupName = string.format("JTAC %i", _groupId), side = _side, country = _country }
-
+     if type(_countOrTemplate) == "table" then
+      if _countOrTemplate.jtac then
+           _details = { units = _troops, groupId = _groupId, groupName = string.format("JTAC %i", _groupId), side = _side, country = _country }
+  
+      else
+          _details = { units = _troops, groupId = _groupId, groupName = string.format("Dropped Group %i", _groupId), side = _side, country = _country }    
+      end
     else
-        _details = { units = _troops, groupId = _groupId, groupName = string.format("Dropped Group %i", _groupId), side = _side, country = _country }    
+         _details = { units = _troops, groupId = _groupId, groupName = string.format("Dropped Group %i", _groupId), side = _side, country = _country }
     end
     
     
