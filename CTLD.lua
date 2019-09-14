@@ -429,16 +429,16 @@ ctld.unitActions = {
 ctld.loadableGroupsbyType = {}
 
 ctld.loadableGroupsbyType['UH-1H'] = {
-                        {name = "Standard Group", inf = 4, mg = 1, at = 1 }, -- will make a loadable group with 5 infantry, 2 MGs and 2 anti-tank for both coalitions
-                        {name = "Anti Air", inf = 3, aa = 3  },
-                        {name = "Anti Tank", inf = 2, at = 4  },
+                        {name = "Standard Group", inf = 4, mg = 2, at = 2 }, -- will make a loadable group with 5 infantry, 2 MGs and 2 anti-tank for both coalitions
+                        {name = "Anti Air", inf = 4, aa = 4  },
+                        {name = "Anti Tank", inf = 3, at = 5  },
                         {name = "Mortar Squad", mortar = 6 },
-                        {name = "Jtac Group", inf = 4, mg = 1, jtac = 1 },
+                        {name = "Jtac Group", inf = 5, mg = 2, jtac = 1 },
                       }
 ctld.loadableGroupsbyType['Mi-8MT'] = {
-                        {name = "Standard Group", inf = 8, mg = 2, at = 2 }, -- will make a loadable group with 5 infantry, 2 MGs and 2 anti-tank for both coalitions
-                        {name = "Anti Air", inf = 6, aa = 6  },
-                        {name = "Anti Tank", inf = 6, at = 6  },
+                        {name = "Standard Group", inf = 10, mg = 4, at = 2 }, -- will make a loadable group with 5 infantry, 2 MGs and 2 anti-tank for both coalitions
+                        {name = "Anti Air", inf = 10, aa = 6  },
+                        {name = "Anti Tank", inf = 8, at = 8  },
                         {name = "Mortar Squad", mortar = 6 },
                         {name = "Jtac Group", inf = 8, mg = 3, jtac = 1 },
                       }
