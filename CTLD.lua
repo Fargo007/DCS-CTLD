@@ -60,7 +60,7 @@ ctld.maximumDistanceLogistic = 200 -- max distance from vehicle to logistics to 
 ctld.maximumSearchDistance = 4000 -- max distance for troops to search for enemy
 ctld.maximumMoveDistance = 2000 -- max distance for troops to move from drop point if no enemy is nearby
 
-ctld.minimumDeployDistance = 500 -- minimum distance from a friendly pickup zone where you can deploy a crate
+ctld.minimumDeployDistance = 0 -- minimum distance from a friendly pickup zone where you can deploy a crate
 
 ctld.numberOfTroops = 10 -- default number of troops to load on a transport heli or C-130 
 							-- also works as maximum size of group that'll fit into a helicopter unless overridden
@@ -80,7 +80,7 @@ ctld.enabledFOBBuilding = true -- if true, you can load a crate INTO a C-130 tha
 -- In future i'd like it to be a FARP but so far that seems impossible...
 -- You can also enable troop Pickup at FOBS
 
-ctld.cratesRequiredForFOB = 3 -- The amount of crates required to build a FOB. Once built, helis can spawn crates at this outpost to be carried and deployed in another area.
+ctld.cratesRequiredForFOB = 1 -- The amount of crates required to build a FOB. Once built, helis can spawn crates at this outpost to be carried and deployed in another area.
 -- The large crates can only be loaded and dropped by large aircraft, like the C-130 and listed in ctld.vehicleTransportEnabled
 -- Small FOB crates can be moved by helicopter. The FOB will require ctld.cratesRequiredForFOB larges crates and small crates are 1/3 of a large fob crate
 -- To build the FOB entirely out of small crates you will need ctld.cratesRequiredForFOB * 3
@@ -89,7 +89,7 @@ ctld.troopPickupAtFOB = true -- if true, troops can also be picked up at a creat
 
 ctld.buildTimeFOB = 120 --time in seconds for the FOB to be built
 
-ctld.crateWaitTime = 120 -- time in seconds to wait before you can spawn another crate
+ctld.crateWaitTime = 0 -- time in seconds to wait before you can spawn another crate
 
 ctld.forceCrateToBeMoved = true -- a crate must be picked up at least once and moved before it can be unpacked. Helps to reduce crate spam
 
@@ -165,7 +165,7 @@ ctld.JTAC_lock = "all" -- "vehicle" OR "troop" OR "all" forces JTAC to only lock
 
 --pickupZones = { "Zone name or Ship Unit Name", "smoke color", "limit (-1 unlimited)", "ACTIVE (yes/no)", "side (0 = Both sides / 1 = Red / 2 = Blue )", flag number (optional) }
 ctld.pickupZones = {
-    { "pickzone1", "blue", 0, "yes", 0 },
+    { "pickzone1", "blue", -1, "yes", 0 },
     { "pickzone2", "red", -1, "yes", 0 },
     { "pickzone3", "none", -1, "yes", 0 },
     { "pickzone4", "none", -1, "yes", 0 },
@@ -212,7 +212,8 @@ ctld.dropOffZones = {
 
 
 --wpZones = { "Zone name", "smoke color",  "ACTIVE (yes/no)", "side (0 = Both sides / 1 = Red / 2 = Blue )", formation ( }
---[["Off Road" - moving off-road in Column formation 
+--[[
+"Off Road" - moving off-road in Column formation 
  "On Road" - moving on road in Column formation 
  "Rank" - moving off road in Row formation 
  "Cone" - moving in Wedge formation 
@@ -272,6 +273,19 @@ ctld.wpZones = {
     { "wpzone58", "none","yes", 0 ,"Off Road"}, 
     { "wpzone59", "none","yes", 0 ,"Off Road"}, 
 }
+
+ctld.fobnames = {} -- available
+ctld.fobnames["London"] = true
+ctld.fobnames["Dallas"] = true
+ctld.fobnames["Paris"] = true
+ctld.fobnames["Moscow"] = true
+ctld.fobnames["Berlin"] = true
+ctld.fobnames["Rome"] = true
+ctld.fobnames["Madrid"] = true
+ctld.fobnames["Warsaw"] = true
+ctld.fobnames["Dublin"] = true
+ctld.fobnames["Perth"] = true
+
 
 -- ME zone name, increment flag per group ,flagproceed(flag or nil), return to dropzone (true, false), proceed to zone (zone or nil) 
 az.actionZones = {
@@ -376,7 +390,7 @@ ctld.unitLoadLimits = {
     ["Mi-8MT"] = 16,
     ["UH-60A"] = 16,
     
-    ["CH-47D"] = 20,
+    ["CH-47D"] = 30,
     
 
 }
@@ -1937,7 +1951,11 @@ function ctld.generateTroopTypes(_side, _countOrTemplate, _country)
     local _details
      if type(_countOrTemplate) == "table" then
       if _countOrTemplate.jtac then
-           _details = { units = _troops, groupId = _groupId, groupName = string.format("JTAC %i", _groupId), side = _side, country = _country }
+            if _countOrTemplate.jtac > 0 then
+               _details = { units = _troops, groupId = _groupId, groupName = string.format("JTAC %i", _groupId), side = _side, country = _country }
+            else
+              _details = { units = _troops, groupId = _groupId, groupName = string.format("Dropped Group %i", _groupId), side = _side, country = _country }
+            end
   
       else
           _details = { units = _troops, groupId = _groupId, groupName = string.format("Dropped Group %i", _groupId), side = _side, country = _country }    
@@ -3163,12 +3181,12 @@ function ctld.unpackCrates(_arguments)
             local _crate = ctld.getClosestCrate(_heli, _crates)
 
 
-            if ctld.inLogisticsZone(_heli) == true  or  ctld.farEnoughFromLogisticZone(_heli) == false then
+     --       if ctld.inLogisticsZone(_heli) == true  or  ctld.farEnoughFromLogisticZone(_heli) == false then
 
-                ctld.displayMessageToGroup(_heli, "You can't unpack that here! Take it to where it's needed!", 20)
+--                ctld.displayMessageToGroup(_heli, "You can't unpack that here! Take it to where it's needed!", 20)
 
-                return
-            end
+  --              return
+    --        end
 
 
 
@@ -3181,10 +3199,10 @@ function ctld.unpackCrates(_arguments)
 
             elseif _crate ~= nil and _crate.dist < 200 then
 
-                if ctld.forceCrateToBeMoved and ctld.crateMove[_crate.crateUnit:getName()] then
-                    ctld.displayMessageToGroup(_heli,"Sorry you must move this crate before you unpack it!", 20)
-                    return
-                end
+          --      if ctld.forceCrateToBeMoved and ctld.crateMove[_crate.crateUnit:getName()] then
+      --              ctld.displayMessageToGroup(_heli,"Sorry you must move this crate before you unpack it!", 20)
+        --            return
+            --    end
 
 
                 local _aaTemplate = ctld.getAATemplate(_crate.details.unit)
@@ -3331,7 +3349,15 @@ function ctld.unpackFOBCrates(_crates, _heli)
 
             local _unitId = ctld.getNextUnitId()
             local _name = "Deployed FOB #" .. _unitId
-
+             for _fobname, available in pairs(ctld.fobnames) do
+                if available then
+                    _name = _fobname 
+                    ctld.fobnames[_fobname] = false
+                   break     
+                end  
+                       
+            end
+            
             local _fob = ctld.spawnFOB(_args[2], _unitId, _args[1], _name)
 
             --make it able to deploy crates
@@ -3339,7 +3365,7 @@ function ctld.unpackFOBCrates(_crates, _heli)
 
             ctld.beaconCount = ctld.beaconCount + 1
 
-            local _radioBeaconName = "FOB Beacon #" .. ctld.beaconCount
+             local _radioBeaconName = "FOB ".._name .." Beacon #" .. ctld.beaconCount
 
             local _radioBeaconDetails = ctld.createRadioBeacon(_args[1], _args[3], _args[2], _radioBeaconName, nil, true)
 
@@ -4187,7 +4213,7 @@ function ctld.spawnCrateGroup(_heli, _positions, _types)
 
     local _id = ctld.getNextGroupId()
 
-    local _groupName = _types[1] .. "  #" .. _id
+    local _groupName = "PM_" .. _types[1] .. "  #" .. _id
 
     local _side = _heli:getCoalition()
 
