@@ -3,6 +3,8 @@
     assert(loadfile("C:\\LUA Dev Tool\\workspace\\My_Missions\\PersistentMission\\fac.lua"))()
 --assert(loadfile("C:\\Users\\marcos\\Google Drive\\DCS Mission Engine\\Workspace\\DCS_Missions\\CTLD-RUN MODIFICATIONS.lua"))()
 
+assert(loadfile("F:\\Google Drive\\DCS Mission Engine\\NewWorkspace\\Main\\CTLD_CSAR\\CTLD.lua"))()
+
     Allows Huey, Mi-8 and C130 to transport troops internally and Helicopters to transport Logistic / Vehicle units to the field via sling-loads
     without requiring external mods.
 
@@ -51,6 +53,8 @@ ctld.maxExtractDistance = 500 -- max distance from vehicle to troops to allow a 
 ctld.loadtimemax = 170
 ctld.embarking = {}
 ctld.heliembarking = {}
+
+ctld.mortargroup = {} -- group Name, linkedgroupName
 -- ----------------------------------------------------------------------------------------------------------
 -- -------------------------------------------------------- Tupper Troops Run to extract end
 -- ----------------------------------------------------------------------------------------------------------
@@ -91,12 +95,12 @@ ctld.buildTimeFOB = 120 --time in seconds for the FOB to be built
 
 ctld.crateWaitTime = 0 -- time in seconds to wait before you can spawn another crate
 
-ctld.forceCrateToBeMoved = true -- a crate must be picked up at least once and moved before it can be unpacked. Helps to reduce crate spam
+ctld.forceCrateToBeMoved = false -- a crate must be picked up at least once and moved before it can be unpacked. Helps to reduce crate spam
 
 ctld.radioSound = "beacon.ogg" -- the name of the sound file to use for the FOB radio beacons. If this isnt added to the mission BEACONS WONT WORK!
 ctld.radioSoundFC3 = "beaconsilent.ogg" -- name of the second silent radio file, used so FC3 aircraft dont hear ALL the beacon noises... :)
 
-ctld.deployedBeaconBattery = 30 -- the battery on deployed beacons will last for this number minutes before needing to be re-deployed
+ctld.deployedBeaconBattery = 120 -- the battery on deployed beacons will last for this number minutes before needing to be re-deployed
 
 ctld.enabledRadioBeaconDrop = true -- if its set to false then beacons cannot be dropped by units
 
@@ -453,7 +457,7 @@ ctld.loadableGroupsbyType['Mi-8MT'] = {
                         {name = "Standard Group", inf = 10, mg = 4, at = 2 }, -- will make a loadable group with 5 infantry, 2 MGs and 2 anti-tank for both coalitions
                         {name = "Anti Air", inf = 10, aa = 6  },
                         {name = "Anti Tank", inf = 8, at = 8  },
-                        {name = "Mortar Squad", mortar = 6 },
+                        {name = "Mortar Squad", mortar = 10 },
                         {name = "Jtac Group", inf = 8, mg = 3, jtac = 1 },
                       }
                       
@@ -600,7 +604,25 @@ end
 -- ctld.spawnGroupAtTrigger("blue", {mg=1,at=2,aa=3,inf=4,mortar=5},"spawn2", 2000)
 -- Spawns 1 machine gun, 2 anti tank, 3 anti air, 4 standard soldiers and 5 mortars
 --
+--[[  
+function ctld.spawnmortargroup( _number, _groupSide, _country, _droppedTroops )
+ -- Tupper  MORTAR SQUAD 
+    if type(_number) == "table" then
+        if _number.mortar then
+            
+            local _groupDetailsMortar = ctld.generateTroopTypes(_groupSide, { mortar = _number.mortar }, _country)
+            local _droppedMortar      = ctld.spawnDroppedGroup(_pos3, _groupDetailsMortar, false, 0);
+            
+            ctld.mortargroup[_droppedMortar:getName()] =  _droppedTroops:getName()
+            
+            
+        end
+    end
 
+
+end
+	]]
+	
 	
 function ctld.spawnGroupAtTrigger(_groupSide, _number, _triggerName, _searchRadius)
     local _spawnTrigger = trigger.misc.getZone(_triggerName) -- trigger to use as reference position
@@ -630,12 +652,13 @@ function ctld.spawnGroupAtTrigger(_groupSide, _number, _triggerName, _searchRadi
     local _groupDetails = ctld.generateTroopTypes(_groupSide, _number, _country)
 
     local _droppedTroops = ctld.spawnDroppedGroup(_pos3, _groupDetails, false, _searchRadius);
-
+ 
     if _groupSide == 1 then
         table.insert(ctld.droppedTroopsRED, _droppedTroops:getName())
     else
         table.insert(ctld.droppedTroopsBLUE, _droppedTroops:getName())
     end
+    return _droppedTroops
 end
 
 
@@ -675,6 +698,9 @@ function ctld.spawnGroupAtPoint(_groupSide, _number, _point, _searchRadius)
 
     local _droppedTroops = ctld.spawnDroppedGroup(_point, _groupDetails, false, _searchRadius);
 
+      -- add logic here TUPPER
+       
+     
     if _groupSide == 1 then
         table.insert(ctld.droppedTroopsRED, _droppedTroops:getName())
     else
@@ -1899,15 +1925,16 @@ function ctld.generateTroopTypes(_side, _countOrTemplate, _country)
         end
 
         if _countOrTemplate.mortar then
-            _troops = ctld.insertIntoTroopsArray("2B11 mortar",_countOrTemplate.mortar,_troops)
+            _troops = ctld.insertIntoTroopsArray("Soldier M4",_countOrTemplate.mortar,_troops)
+            --_troops = ctld.insertIntoTroopsArray("2B11 mortar",_countOrTemplate.mortar,_troops)
         end
         
           -- Tupperware Begin        (2)
         if _countOrTemplate.jtac then
             _troops = ctld.insertIntoTroopsArray("Soldier M249",_countOrTemplate.jtac,_troops)
-            
-            
         end
+        
+        
 
   -- Tupperware end
 
@@ -1949,7 +1976,7 @@ function ctld.generateTroopTypes(_side, _countOrTemplate, _country)
 
     local _groupId = ctld.getNextGroupId()
     local _details
-     if type(_countOrTemplate) == "table" then
+    if type(_countOrTemplate) == "table" then
       if _countOrTemplate.jtac then
             if _countOrTemplate.jtac > 0 then
                _details = { units = _troops, groupId = _groupId, groupName = string.format("JTAC %i", _groupId), side = _side, country = _country }
@@ -1958,7 +1985,16 @@ function ctld.generateTroopTypes(_side, _countOrTemplate, _country)
             end
   
       else
-          _details = { units = _troops, groupId = _groupId, groupName = string.format("Dropped Group %i", _groupId), side = _side, country = _country }    
+          if _countOrTemplate.mortar then
+                if _countOrTemplate.mortar > 0 then
+                   _details = { units = _troops, groupId = _groupId, groupName = string.format("MORTAR %i", _groupId), side = _side, country = _country }
+                else
+                  _details = { units = _troops, groupId = _groupId, groupName = string.format("Dropped Group %i", _groupId), side = _side, country = _country }
+                end
+      
+          else
+              _details = { units = _troops, groupId = _groupId, groupName = string.format("Dropped Group %i", _groupId), side = _side, country = _country }    
+          end    
       end
     else
          _details = { units = _troops, groupId = _groupId, groupName = string.format("Dropped Group %i", _groupId), side = _side, country = _country }
@@ -1968,6 +2004,28 @@ function ctld.generateTroopTypes(_side, _countOrTemplate, _country)
 
     return _details
 end
+
+
+function ctld.generateMortars(_side, _count, _country)
+    
+    
+    local _troops = {}
+    if _count then
+        _troops = ctld.insertIntoTroopsArray("2B11 mortar",_count,_troops)
+    end
+
+    local _groupId = ctld.getNextGroupId()
+    local _details
+
+    _details = { units = _troops, groupId = _groupId, groupName = string.format("2B11 Group %i", _groupId), side = _side, country = _country }
+    
+    
+
+    return _details
+end
+
+
+
 -- Tupper Begin
 --Special F10 function for players for troops
 --function ctld.unloadExtractTroops(_args)
@@ -2191,18 +2249,45 @@ function ctld.loadTroopsFromZone(_args)
 
     local _zone = ctld.inPickupZone(_heli)
     -- Tupper begin
-    --[[
+    
     if ctld.troopsOnboard(_heli, _troops) then
-
+        
         if _troops then
-            ctld.displayMessageToGroup(_heli, "You already have troops onboard.", 10)
+            
+             local _extract
+  --     trigger.action.outTextForCoalition(_heli:getCoalition(),"Unit Check allow extract " .. tostring(_allowExtract) , 10)
+          if _allowExtract then
+              -- first check for extractable troops regardless of if we're in a zone or not
+              if _troops then
+                  if _heli:getCoalition() == 1 then
+                      _extract = ctld.findNearestGroup(_heli, ctld.droppedTroopsRED)
+                  else
+                      _extract = ctld.findNearestGroup(_heli, ctld.droppedTroopsBLUE)
+                  end
+              else
+      
+                  if _heli:getCoalition() == 1 then
+                      _extract = ctld.findNearestGroup(_heli, ctld.droppedVehiclesRED)
+                  else
+                      _extract = ctld.findNearestGroup(_heli, ctld.droppedVehiclesBLUE)
+                  end
+              end
+          end
+
+          if _extract == nil then
+              return false
+          end
+                  
+
+            
         else
             ctld.displayMessageToGroup(_heli, "You already have vehicles onboard.", 10)
+            return false
         end
 
-        return false
+        
     end
-    ]]--
+    
 --    tupper end
 
     local _extract
@@ -2514,7 +2599,11 @@ function ctld.extracttroopsAction( _args )
         if  string.match( _onboard.troops.groupName, "JTAC") then       
           ctld.inTransitTroops[_heli:getName()].troops.groupName = string.format("JTAC %i", _groupId)
         else
-          ctld.inTransitTroops[_heli:getName()].troops.groupName = string.format("Dropped Group %i", _groupId)       
+            if  string.match( _onboard.troops.groupName, "MORTAR") then       
+              ctld.inTransitTroops[_heli:getName()].troops.groupName = string.format("MORTAR %i", _groupId)
+            else
+              ctld.inTransitTroops[_heli:getName()].troops.groupName = string.format("Dropped Group %i", _groupId)       
+            end
         end
         
         --trigger.action.outTextForCoalition(_heli:getCoalition(), "Units init " .. tostring(#ctld.inTransitTroops[_heli:getName()].troops.units), 10)
@@ -2529,12 +2618,20 @@ function ctld.extracttroopsAction( _args )
           if  string.match( _onboard.troops.groupName, "JTAC") then       
               ctld.inTransitTroops[_heli:getName()].troops.groupName = string.format("JTAC %i", _groupId)
           else
+            if  string.match( _onboard.troops.groupName, "MORTAR") then       
+              ctld.inTransitTroops[_heli:getName()].troops.groupName = string.format("MORTAR %i", _groupId)
+            else
               ctld.inTransitTroops[_heli:getName()].troops.groupName = string.format("Dropped Group %i", _groupId)       
+            end
           end
           
         else
           if  string.match( _onboard.troops.groupName, "JTAC") then       
             ctld.inTransitTroops[_heli:getName()].troops.groupName = string.format("JTAC %i", ctld.inTransitTroops[_heli:getName()].troops.groupId)
+          else
+            if  string.match( _onboard.troops.groupName, "MORTAR") then       
+              ctld.inTransitTroops[_heli:getName()].troops.groupName = string.format("MORTAR %i", ctld.inTransitTroops[_heli:getName()].troops.groupId)
+            end
           end
         end
       end
@@ -4271,6 +4368,8 @@ function ctld.spawnDroppedGroup(_point, _details, _spawnBehind, _maxSearch)
 
     local _groupName = _details.groupName
 
+
+
     local _group = {
         ["visible"] = false,
       --  ["groupId"] = _details.groupId,
@@ -4351,9 +4450,72 @@ function ctld.spawnDroppedGroup(_point, _details, _spawnBehind, _maxSearch)
 
         ctld.orderGroupToMoveToPoint(_spawnedGroup:getUnit(1), _enemyPos)
     end
+    
+    
+    
 
     return _spawnedGroup
 end
+
+
+function ctld.spawnMortarGroup(_point, _details, _spawnBehind, _maxSearch)
+
+    local _groupName = _details.groupName
+
+
+
+    local _group = {
+        ["visible"] = false,
+      --  ["groupId"] = _details.groupId,
+        ["hidden"] = false,
+        ["units"] = {},
+        --        ["y"] = _positions[1].z,
+        --        ["x"] = _positions[1].x,
+        ["name"] = _groupName,
+        ["task"] = {},
+    }
+
+
+    if _spawnBehind == false then
+
+        -- spawn in circle around heli
+
+        local _pos = _point
+
+        for _i, _detail in ipairs(_details.units) do
+
+            local _angle = math.pi * 2 * (_i - 1) / #_details.units
+            local _xOffset = math.cos(_angle) * 30
+            local _yOffset = math.sin(_angle) * 30
+
+            _group.units[_i] = ctld.createUnit(_pos.x + _xOffset, _pos.z + _yOffset, _angle, _detail)
+        end
+
+    else
+
+        local _pos = _point
+
+        --try to spawn at 6 oclock to us
+        local _angle = math.atan2(_pos.z, _pos.x)
+        local _xOffset = math.cos(_angle) * -30
+        local _yOffset = math.sin(_angle) * -30
+
+
+        for _i, _detail in ipairs(_details.units) do
+            _group.units[_i] = ctld.createUnit(_pos.x + (_xOffset + 10 * _i), _pos.z + (_yOffset + 10 * _i), _angle, _detail)
+        end
+    end
+
+    --switch to MIST
+    _group.category = Group.Category.GROUND;
+    _group.country = _details.country;
+
+    local _spawnedGroup = Group.getByName(mist.dynAdd(_group).name)
+   
+  
+      return _spawnedGroup
+end
+
 
 function ctld.findNearestEnemy(_side, _point, _searchDistance)
 
@@ -6513,11 +6675,13 @@ function az.checkActionZones()
        if _actionzone.flgproceed ~= nil then
           local _flgval = trigger.misc.getUserFlag(_actionzone.flgproceed)
          if _flgval == 1 and _droppedGroup.proceedflg == false then
-           az.groupsdropped[_key].proceedflg = true
+           
            -- Execute action
            if _actionzone.returndropzone == true then
               ctld.orderGroupToMoveToPoint(_group:getUnit(1), _droppedGroup.droppoint)
+              az.groupsdropped[_key].proceedflg = true
            else if _actionzone.nextzone ~= nil then
+             if _droppedGroup.arriveflg == true then
               local _nextZone = trigger.misc.getZone(_actionzone.nextzone)
               if _nextZone  ~= nil then
                   ctld.orderGroupToMoveToPoint(_group:getUnit(1), _nextZone.point)
@@ -6528,6 +6692,8 @@ function az.checkActionZones()
                   az.groupsdropped[_key].arriveflg = false
                   az.groupsdropped[_key].proceedflg = false
               end
+             end
+              
            end           
          end
         end
@@ -6566,6 +6732,206 @@ end
 
 -- End of tupper Action Zones
 
+function ctld.spawnf10Group(_country, _side, _positions, _types)
+
+    local _id = ctld.getNextGroupId()
+
+    local _groupName = "PM_" .. _types[1] .. "  #" .. _id
+
+    local _group = {
+        ["visible"] = false,
+       -- ["groupId"] = _id,
+        ["hidden"] = false,
+        ["units"] = {},
+        --        ["y"] = _positions[1].z,
+        --        ["x"] = _positions[1].x,
+        ["name"] = _groupName,
+        ["task"] = {},
+    }
+
+    if #_positions == 1 then
+
+        local _unitId = ctld.getNextUnitId()
+        local _details = { type = _types[1], unitId = _unitId, name = string.format("Unpacked %s #%i", _types[1], _unitId) }
+
+        _group.units[1] = ctld.createUnit(_positions[1].x + 5, _positions[1].z + 5, 120, _details)
+
+    else
+
+        for _i, _pos in ipairs(_positions) do
+
+            local _unitId = ctld.getNextUnitId()
+            local _details = { type = _types[_i], unitId = _unitId, name = string.format("Unpacked %s #%i", _types[_i], _unitId) }
+
+            _group.units[_i] = ctld.createUnit(_pos.x + 5, _pos.z + 5, 120, _details)
+        end
+    end
+
+    --mist function
+    _group.category = Group.Category.GROUND
+    _group.country = _country
+
+    local _spawnedGroup = Group.getByName(mist.dynAdd(_group).name)
+
+    --local _spawnedGroup = coalition.addGroup(_heli:getCountry(), Group.Category.GROUND, _group)
+
+    --activate by moving and so we can set ROE and Alarm state
+
+    local _dest = _spawnedGroup:getUnit(1):getPoint()
+    _dest = { x = _dest.x + 0.5, _y = _dest.y + 0.5, z = _dest.z + 0.5 }
+
+    ctld.orderGroupToMoveToPoint(_spawnedGroup:getUnit(1), _dest)
+
+    return _spawnedGroup
+end
+
+
+function ctld.checkforf10Mark()
+  
+  timer.scheduleFunction(ctld.checkforf10Mark,nil,timer.getTime() + 10)
+  
+    local f10marks = world.getMarkPanels( )  
+     
+    for key, _mark in pairs (f10marks) do
+      local text = string.upper(_mark.text)
+      
+      if string.match(text, "WATCHEKRAN") then
+       
+     --   local tab = ctld.mysplit(text, ",")
+     --   local radius, state
+     --   if tab[2] ~= nil then
+     --     radius = tonumber(tab[2])
+        local pos = _mark.pos
+        local _flgused = false
+        local _spawnedGroups
+        if string.match(text, "MG") then
+          
+           _spawnedGroups = ctld.spawnf10Group(2, 2, { pos }, {"M1043 HMMWV Armament"})  
+          _flgused = true
+        end
+     
+        if string.match(text, "JTAC") then
+           _spawnedGroups = ctld.spawnf10Group(2, 2, { pos }, {"Hummer"})  
+           local _code = table.remove(ctld.jtacGeneratedLaserCodes, 1)
+            --put to the end
+            table.insert(ctld.jtacGeneratedLaserCodes, _code)
+            ctld.JTACAutoLase(_spawnedGroups:getName(), _code) --(_jtacGroupName, _laserCode, _smoke, _lock, _colour)
+            
+          _flgused = true
+        end
+        
+        if string.match(text, "TOW") then
+          _spawnedGroups = ctld.spawnf10Group(2, 2, { pos }, {"M1045 HMMWV TOW"})
+        
+          _flgused = true
+        end
+        
+         if string.match(text, "ARTY") then
+          _spawnedGroups = ctld.spawnf10Group(2, 2, { pos }, {"M-109"})
+        
+          _flgused = true
+        end
+        
+         if string.match(text, "AMMO") then
+          _spawnedGroups = ctld.spawnf10Group(2, 2, { pos }, {"Ural-375"})
+        
+          _flgused = true
+        end
+      
+          if _flgused == true then
+            trigger.action.removeMark(_mark.idx )
+          end        
+
+      end
+      
+      
+      
+    end
+  
+
+
+end
+
+function ctld.checkForMortar()
+    timer.scheduleFunction(ctld.checkForMortar,nil,timer.getTime() + 30)
+     local _groups = ctld.droppedTroopsBLUE 
+  
+    for _, _groupName in pairs(_groups) do
+        
+        if string.match(_groupName, "MORTAR" ) then
+          local _group = Group.getByName(_groupName)
+          
+          if _group ~= nil then  
+              local _units = _group:getUnits()
+  
+              if _units ~= nil and #_units > 0 then
+  
+                  local _leader = nil
+  
+                  -- find alive leader
+                  for x = 1, #_units do
+                      if _units[x]:getLife() > 1 then
+                          if _units[x]:getLife() > 0 then
+                            _leader = _units[x]
+                            break
+                         end
+                      end
+                  end
+                  
+                  if _leader ~= nil then
+                  
+                    if ctld.mortargroup[_groupName] == nil then
+                        -- Spawn mortars
+                        
+                        local _count =  1
+                        if math.floor(#_units / 2) >= 2 then
+                          _count = math.floor( #_units / 2 ) 
+                        end
+                        
+                        local _groupDetailsMortar = ctld.generateMortars(_leader:getCoalition(), _count ,_leader:getCountry())
+                        local _pos3 = _leader:getPoint()
+                        _pos3.x  = _pos3.x - 5  
+                        local _droppedMortar      = ctld.spawnMortarGroup(_pos3, _groupDetailsMortar, false, 0);
+            
+                        ctld.mortargroup[_groupName] =  _droppedMortar:getName()
+                        
+                        
+                    else
+                      -- Check distance / Respawn mortars.
+                      local _LeaderPos = _leader:getPoint()
+                      local _mortarGroup = Group.getByName( ctld.mortargroup[_groupName] )
+                      local _mortarUnit  = _mortarGroup:getUnit(1)
+                      local _mortarPos  = _mortarUnit:getPoint();
+                      
+                      local _dist = ctld.getDistance(_LeaderPos,_mortarPos)
+                      
+                      if _dist > 50 then
+                          _mortarGroup:destroy()
+                          ctld.mortargroup[_groupName] = nil                      
+                      end
+                    end
+                  
+                  else
+                      if ctld.mortargroup[_groupName] ~= nil then
+                          --Destroy mortars
+                           local _mortarGroup = Group.getByName( ctld.mortargroup[_groupName] )
+                           _mortarGroup:destroy()
+                          ctld.mortargroup[_groupName] = nil         
+                          
+                      end
+                  end
+  
+                
+              end
+          
+          end
+       end
+    end
+    
+
+
+
+end
 
 
 
@@ -6585,7 +6951,15 @@ timer.scheduleFunction(function()
     if ctld.enableCrates == true and ctld.slingLoad == false and ctld.hoverPickup == true then
         timer.scheduleFunction(ctld.checkHoverStatus, nil, timer.getTime() + 1)
     end
-
+    
+    -- Tupper  NEW Mortar Logic 
+    timer.scheduleFunction(ctld.checkForMortar,nil,timer.getTime() + 5)
+   -- Tupper End
+   -- Tupper F10 Marks
+    
+      timer.scheduleFunction(ctld.checkforf10Mark,nil,timer.getTime() + 10)
+   --
+   
 end,nil, timer.getTime()+1 )
 
 --event handler for deaths
